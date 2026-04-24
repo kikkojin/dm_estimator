@@ -129,8 +129,18 @@ class DME_Sheets
             }
 
             $rows = self::parse_csv((string) wp_remote_retrieve_body($csv_res));
-            $normalized = self::normalize_price_table($sheet_name, $rows);
-            if (!empty($normalized)) {
+            $row_blocks = self::split_row_blocks($rows);
+            $total_blocks = count($row_blocks);
+
+            foreach ($row_blocks as $block_index => $row_block) {
+                $normalized = self::normalize_price_table($sheet_name, $row_block);
+                if (empty($normalized)) {
+                    continue;
+                }
+
+                if ($total_blocks > 1) {
+                    $normalized['sheet_name'] = sprintf('%s [%d]', $sheet_name, $block_index + 1);
+                }
                 $sheets[] = $normalized;
             }
         }
@@ -147,17 +157,58 @@ class DME_Sheets
     private static function parse_csv($csv)
     {
         $csv = preg_replace('/^\xEF\xBB\xBF/', '', $csv);
-        $lines = preg_split('/\r\n|\n|\r/', trim($csv));
+        $lines = preg_split('/\r\n|\n|\r/', (string) $csv);
         $rows = [];
 
         foreach ($lines as $line) {
             if ($line === '') {
+                $rows[] = [];
                 continue;
             }
             $rows[] = str_getcsv($line);
         }
 
         return $rows;
+    }
+
+    /**
+     * 空行で分割した行ブロックを返す。
+     *
+     * @param array $rows CSV行配列。
+     * @return array
+     */
+    private static function split_row_blocks($rows)
+    {
+        $blocks = [];
+        $current = [];
+
+        foreach ($rows as $row) {
+            $is_empty = true;
+            if (is_array($row)) {
+                foreach ($row as $cell) {
+                    if (trim((string) $cell) !== '') {
+                        $is_empty = false;
+                        break;
+                    }
+                }
+            }
+
+            if ($is_empty) {
+                if (!empty($current)) {
+                    $blocks[] = $current;
+                    $current = [];
+                }
+                continue;
+            }
+
+            $current[] = $row;
+        }
+
+        if (!empty($current)) {
+            $blocks[] = $current;
+        }
+
+        return $blocks;
     }
 
     /**
