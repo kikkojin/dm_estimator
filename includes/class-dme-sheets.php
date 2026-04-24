@@ -9,6 +9,9 @@ if (!defined('ABSPATH')) {
  */
 class DME_Sheets
 {
+    const CACHE_KEY = 'dme_sheet_books_v2';
+    const CACHE_KEY_PREFIX = 'dme_sheet_books_';
+
     /**
      * APIキー未設定警告の重複出力抑止。
      *
@@ -86,13 +89,20 @@ class DME_Sheets
      */
     public static function get_all_books()
     {
-        $cache_key = 'dme_sheet_books_v2';
-        $cached = get_transient($cache_key);
-        if (is_array($cached)) {
-            self::debug_log('Cache hit');
-            return $cached;
+        $disable_cache = self::is_price_cache_disabled();
+        $cache_key = self::CACHE_KEY;
+
+        if ($disable_cache) {
+            self::debug_log('disable_price_cache is ON; bypassing transient cache');
+            self::clear_books_cache('disable_price_cache is enabled');
+        } else {
+            $cached = get_transient($cache_key);
+            if (is_array($cached)) {
+                self::debug_log('Cache hit');
+                return $cached;
+            }
+            self::debug_log('Cache miss; loading sheets');
         }
-        self::debug_log('Cache miss; loading sheets');
 
         $output = [];
         foreach (self::SHEET_BOOKS as $book_key => $spreadsheet_id) {
@@ -102,8 +112,94 @@ class DME_Sheets
             ];
         }
 
+        if ($disable_cache) {
+            return $output;
+        }
+
+        if (!self::has_any_price_data($output)) {
+            self::debug_log('Fetch result was empty; skipped transient save');
+            return $output;
+        }
+
         set_transient($cache_key, $output, 30 * MINUTE_IN_SECONDS);
         return $output;
+    }
+
+    /**
+     * 価格表キャッシュ設定を確認。
+     *
+     * @return bool
+     */
+    private static function is_price_cache_disabled()
+    {
+        if (!class_exists('DME_Admin') || !method_exists('DME_Admin', 'is_price_cache_disabled')) {
+            return false;
+        }
+
+        return DME_Admin::is_price_cache_disabled();
+    }
+
+    /**
+     * 価格データが1件以上あるか判定。
+     *
+     * @param array $books 全ブック配列。
+     * @return bool
+     */
+    private static function has_any_price_data($books)
+    {
+        if (!is_array($books)) {
+            return false;
+        }
+
+        foreach ($books as $book) {
+            if (!empty($book['sheets']) && is_array($book['sheets'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * 価格表キャッシュを削除。
+     *
+     * @param string $reason 削除理由。
+     * @return void
+     */
+    public static function clear_books_cache($reason = '')
+    {
+        global $wpdb;
+
+        delete_transient(self::CACHE_KEY);
+
+        $like = $wpdb->esc_like('_transient_' . self::CACHE_KEY_PREFIX) . '%';
+        $timeout_like = $wpdb->esc_like('_transient_timeout_' . self::CACHE_KEY_PREFIX) . '%';
+
+        $wpdb->query(
+            $wpdb->prepare(
+                "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
+                $like,
+                $timeout_like
+            )
+        );
+
+        if (is_multisite()) {
+            delete_site_transient(self::CACHE_KEY);
+            $site_like = $wpdb->esc_like('_site_transient_' . self::CACHE_KEY_PREFIX) . '%';
+            $site_timeout_like = $wpdb->esc_like('_site_transient_timeout_' . self::CACHE_KEY_PREFIX) . '%';
+            $wpdb->query(
+                $wpdb->prepare(
+                    "DELETE FROM {$wpdb->sitemeta} WHERE meta_key LIKE %s OR meta_key LIKE %s",
+                    $site_like,
+                    $site_timeout_like
+                )
+            );
+        }
+
+        self::debug_log('Cleared price cache transients', [
+            'prefix' => self::CACHE_KEY_PREFIX,
+            'reason' => (string) $reason,
+        ]);
     }
 
     /**

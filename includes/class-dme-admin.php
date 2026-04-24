@@ -20,6 +20,7 @@ class DME_Admin
     {
         add_action('admin_menu', [__CLASS__, 'register_menu']);
         add_action('admin_init', [__CLASS__, 'register_settings']);
+        add_action('admin_post_dme_delete_price_cache', [__CLASS__, 'handle_delete_price_cache']);
     }
 
     /**
@@ -51,6 +52,7 @@ class DME_Admin
             'default' => [
                 'recipient_email' => get_option('admin_email'),
                 'google_api_key' => '',
+                'disable_price_cache' => 0,
             ],
         ]);
 
@@ -71,6 +73,14 @@ class DME_Admin
             'dme-settings',
             'dme_main_section'
         );
+
+        add_settings_field(
+            'disable_price_cache',
+            '価格表キャッシュ',
+            [__CLASS__, 'render_disable_price_cache_field'],
+            'dme-settings',
+            'dme_main_section'
+        );
     }
 
     /**
@@ -81,10 +91,20 @@ class DME_Admin
      */
     public static function sanitize_settings($input)
     {
-        return [
+        $current = get_option(self::OPTION_KEY, []);
+        $next = [
             'recipient_email' => isset($input['recipient_email']) ? sanitize_email($input['recipient_email']) : '',
             'google_api_key' => isset($input['google_api_key']) ? sanitize_text_field($input['google_api_key']) : '',
+            'disable_price_cache' => empty($input['disable_price_cache']) ? 0 : 1,
         ];
+
+        $api_key_changed = (string) ($current['google_api_key'] ?? '') !== $next['google_api_key'];
+        $disable_cache_changed = (int) ($current['disable_price_cache'] ?? 0) !== (int) $next['disable_price_cache'];
+        if ($api_key_changed || $disable_cache_changed) {
+            DME_Sheets::clear_books_cache('Settings updated: API key or disable_price_cache changed');
+        }
+
+        return $next;
     }
 
     /**
@@ -118,6 +138,24 @@ class DME_Admin
     }
 
     /**
+     * キャッシュ無効化チェックボックス描画。
+     *
+     * @return void
+     */
+    public static function render_disable_price_cache_field()
+    {
+        $settings = get_option(self::OPTION_KEY, []);
+        $checked = !empty($settings['disable_price_cache']);
+        ?>
+        <label>
+            <input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[disable_price_cache]" value="1" <?php checked($checked); ?> />
+            価格表キャッシュを無効化する（開発・確認用）
+        </label>
+        <p class="description">チェック中は、価格表データをキャッシュせず、ページ表示ごとにGoogleスプレッドシートから再取得します。通常運用ではOFFにしてください。</p>
+        <?php
+    }
+
+    /**
      * 設定画面。
      *
      * @return void
@@ -131,6 +169,9 @@ class DME_Admin
         ?>
         <div class="wrap">
             <h1>DM Estimator 設定</h1>
+            <?php if (isset($_GET['dme_cache_deleted']) && $_GET['dme_cache_deleted'] === '1') : ?>
+                <div class="notice notice-success is-dismissible"><p>価格表キャッシュを削除しました。</p></div>
+            <?php endif; ?>
             <?php if ($api_key === '') : ?>
                 <div class="notice notice-warning"><p><strong>Google Sheets API Key が未設定です。</strong> 価格表のシート名を自動取得できないため、見積データが読み込まれません。</p></div>
                 <?php self::debug_log_missing_api_key_notice(); ?>
@@ -141,6 +182,14 @@ class DME_Admin
                 do_settings_sections('dme-settings');
                 submit_button();
                 ?>
+            </form>
+            <hr />
+            <h2>キャッシュ操作</h2>
+            <p>価格表キャッシュを手動で削除できます。</p>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                <?php wp_nonce_field('dme_delete_price_cache_action', 'dme_delete_price_cache_nonce'); ?>
+                <input type="hidden" name="action" value="dme_delete_price_cache" />
+                <?php submit_button('価格表キャッシュを削除', 'secondary', 'submit', false); ?>
             </form>
         </div>
         <?php
@@ -172,6 +221,43 @@ class DME_Admin
             return trim((string) $settings['google_api_key']);
         }
         return '';
+    }
+
+    /**
+     * 価格表キャッシュ無効化設定。
+     *
+     * @return bool
+     */
+    public static function is_price_cache_disabled()
+    {
+        $settings = get_option(self::OPTION_KEY, []);
+        return !empty($settings['disable_price_cache']);
+    }
+
+    /**
+     * キャッシュ削除ボタン処理。
+     *
+     * @return void
+     */
+    public static function handle_delete_price_cache()
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Forbidden');
+        }
+
+        check_admin_referer('dme_delete_price_cache_action', 'dme_delete_price_cache_nonce');
+
+        DME_Sheets::clear_books_cache('Manual clear from admin settings');
+
+        $redirect_url = add_query_arg(
+            [
+                'page' => 'dme-settings',
+                'dme_cache_deleted' => '1',
+            ],
+            admin_url('options-general.php')
+        );
+        wp_safe_redirect($redirect_url);
+        exit;
     }
 
     /**
