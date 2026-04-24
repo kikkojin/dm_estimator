@@ -26,6 +26,13 @@ class DME_Sheets
     ];
 
     /**
+     * ブックごとの固定シート名（必要に応じて filter で上書き）。
+     *
+     * @var array
+     */
+    const SHEET_TITLES = [];
+
+    /**
      * フロント向けカタログを返す。
      *
      * @return array
@@ -54,13 +61,22 @@ class DME_Sheets
             }
         }
 
-        return [
+        $catalog = [
             'printCatalog' => $print_catalog,
             'workFees' => isset($all['dm_work']) ? $all['dm_work']['sheets'] : [],
             'paperWeights' => isset($all['paper_weight']) ? $all['paper_weight']['sheets'] : [],
             'postage' => isset($all['postage']) ? $all['postage']['sheets'] : [],
             'updatedAt' => gmdate('c'),
         ];
+
+        self::debug_log('build_front_catalog result summary', [
+            'printCatalog_count' => count($catalog['printCatalog']),
+            'workFees_count' => count($catalog['workFees']),
+            'paperWeights_count' => count($catalog['paperWeights']),
+            'postage_count' => count($catalog['postage']),
+        ]);
+
+        return $catalog;
     }
 
     /**
@@ -96,39 +112,59 @@ class DME_Sheets
      */
     private static function load_book_sheets($spreadsheet_id)
     {
-        $worksheets_url = sprintf(
-            'https://spreadsheets.google.com/feeds/worksheets/%s/public/basic?alt=json',
-            rawurlencode($spreadsheet_id)
-        );
-
-        $res = wp_remote_get($worksheets_url, ['timeout' => 15]);
-        if (is_wp_error($res)) {
-            return [];
-        }
-
-        $json = json_decode((string) wp_remote_retrieve_body($res), true);
-        if (!is_array($json) || empty($json['feed']['entry'])) {
+        $sheet_names = self::get_sheet_names($spreadsheet_id);
+        if (empty($sheet_names)) {
+            self::debug_log('No sheet names discovered', [
+                'spreadsheet_id' => $spreadsheet_id,
+            ]);
             return [];
         }
 
         $sheets = [];
-        foreach ($json['feed']['entry'] as $entry) {
-            $sheet_name = isset($entry['title']['$t']) ? (string) $entry['title']['$t'] : '';
+        $fetched_sheet_names = [];
+        $normalized_count = 0;
+        foreach ($sheet_names as $sheet_name) {
+            $sheet_name = trim((string) $sheet_name);
             if ($sheet_name === '') {
                 continue;
             }
+            $fetched_sheet_names[] = $sheet_name;
 
             $csv_url = sprintf(
                 'https://docs.google.com/spreadsheets/d/%s/gviz/tq?tqx=out:csv&sheet=%s',
                 rawurlencode($spreadsheet_id),
                 rawurlencode($sheet_name)
             );
+            self::debug_log('CSV request URL', [
+                'spreadsheet_id' => $spreadsheet_id,
+                'sheet_name' => $sheet_name,
+                'csv_url' => $csv_url,
+            ]);
+
             $csv_res = wp_remote_get($csv_url, ['timeout' => 15]);
             if (is_wp_error($csv_res)) {
+                self::debug_log('CSV request failed', [
+                    'spreadsheet_id' => $spreadsheet_id,
+                    'sheet_name' => $sheet_name,
+                    'error' => $csv_res->get_error_message(),
+                ]);
                 continue;
             }
 
-            $rows = self::parse_csv((string) wp_remote_retrieve_body($csv_res));
+            $status = (int) wp_remote_retrieve_response_code($csv_res);
+            $body = (string) wp_remote_retrieve_body($csv_res);
+            self::debug_log('CSV response', [
+                'spreadsheet_id' => $spreadsheet_id,
+                'sheet_name' => $sheet_name,
+                'http_status' => $status,
+                'body_head_300' => mb_substr($body, 0, 300),
+            ]);
+
+            if ($status < 200 || $status >= 300) {
+                continue;
+            }
+
+            $rows = self::parse_csv($body);
             $row_blocks = self::split_row_blocks($rows);
             $total_blocks = count($row_blocks);
 
@@ -137,6 +173,7 @@ class DME_Sheets
                 if (empty($normalized)) {
                     continue;
                 }
+                $normalized_count++;
 
                 if ($total_blocks > 1) {
                     $normalized['sheet_name'] = sprintf('%s [%d]', $sheet_name, $block_index + 1);
@@ -145,7 +182,132 @@ class DME_Sheets
             }
         }
 
+        self::debug_log('Book load summary', [
+            'spreadsheet_id' => $spreadsheet_id,
+            'fetched_sheet_names' => $fetched_sheet_names,
+            'normalized_valid_count' => $normalized_count,
+        ]);
+
         return $sheets;
+    }
+
+    /**
+     * スプレッドシートからシート名一覧を取得する。
+     * 優先順位:
+     * 1) 固定シート名（定数/フィルター）
+     * 2) Google Sheets API v4（APIキー指定時）
+     *
+     * @param string $spreadsheet_id スプレッドシートID。
+     * @return array
+     */
+    private static function get_sheet_names($spreadsheet_id)
+    {
+        $static_map = apply_filters('dme_sheet_titles_map', self::SHEET_TITLES);
+        if (isset($static_map[$spreadsheet_id]) && is_array($static_map[$spreadsheet_id]) && !empty($static_map[$spreadsheet_id])) {
+            self::debug_log('Using static sheet names', [
+                'spreadsheet_id' => $spreadsheet_id,
+                'sheet_names' => $static_map[$spreadsheet_id],
+            ]);
+            return array_values($static_map[$spreadsheet_id]);
+        }
+
+        $api_key = self::get_google_api_key();
+        if ($api_key === '') {
+            self::debug_log('Google API key is empty; cannot discover sheet names via v4', [
+                'spreadsheet_id' => $spreadsheet_id,
+            ]);
+            return [];
+        }
+
+        $v4_url = sprintf(
+            'https://sheets.googleapis.com/v4/spreadsheets/%s?fields=sheets.properties.title&key=%s',
+            rawurlencode($spreadsheet_id),
+            rawurlencode($api_key)
+        );
+        self::debug_log('V4 sheet-list request URL', [
+            'spreadsheet_id' => $spreadsheet_id,
+            'url' => $v4_url,
+        ]);
+
+        $res = wp_remote_get($v4_url, ['timeout' => 15]);
+        if (is_wp_error($res)) {
+            self::debug_log('V4 sheet-list request failed', [
+                'spreadsheet_id' => $spreadsheet_id,
+                'error' => $res->get_error_message(),
+            ]);
+            return [];
+        }
+
+        $status = (int) wp_remote_retrieve_response_code($res);
+        $body = (string) wp_remote_retrieve_body($res);
+        self::debug_log('V4 sheet-list response', [
+            'spreadsheet_id' => $spreadsheet_id,
+            'http_status' => $status,
+            'body_head_300' => mb_substr($body, 0, 300),
+        ]);
+
+        if ($status < 200 || $status >= 300) {
+            return [];
+        }
+
+        $json = json_decode($body, true);
+        if (!is_array($json) || empty($json['sheets']) || !is_array($json['sheets'])) {
+            return [];
+        }
+
+        $sheet_names = [];
+        foreach ($json['sheets'] as $sheet) {
+            if (!empty($sheet['properties']['title'])) {
+                $sheet_names[] = (string) $sheet['properties']['title'];
+            }
+        }
+
+        self::debug_log('V4 discovered sheet names', [
+            'spreadsheet_id' => $spreadsheet_id,
+            'sheet_names' => $sheet_names,
+        ]);
+
+        return $sheet_names;
+    }
+
+    /**
+     * Google APIキーを取得。
+     *
+     * @return string
+     */
+    private static function get_google_api_key()
+    {
+        if (defined('DME_GOOGLE_API_KEY') && DME_GOOGLE_API_KEY) {
+            return (string) DME_GOOGLE_API_KEY;
+        }
+
+        $option = get_option('dme_google_api_key');
+        return is_string($option) ? trim($option) : '';
+    }
+
+    /**
+     * debug.log 用の出力ヘルパー。
+     *
+     * @param string $message メッセージ。
+     * @param array  $context 補足情報。
+     * @return void
+     */
+    private static function debug_log($message, $context = [])
+    {
+        if (!(defined('WP_DEBUG') && WP_DEBUG)) {
+            return;
+        }
+
+        $prefix = '[DME_Sheets] ';
+        $line = $prefix . $message;
+        if (!empty($context)) {
+            $json = wp_json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            if (is_string($json) && $json !== '') {
+                $line .= ' ' . $json;
+            }
+        }
+
+        error_log($line);
     }
 
     /**
