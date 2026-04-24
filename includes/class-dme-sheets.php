@@ -96,7 +96,7 @@ class DME_Sheets
         foreach (self::SHEET_BOOKS as $book_key => $spreadsheet_id) {
             $output[$book_key] = [
                 'label' => $book_key,
-                'sheets' => self::load_book_sheets($spreadsheet_id),
+                'sheets' => self::load_book_sheets($spreadsheet_id, $book_key),
             ];
         }
 
@@ -108,13 +108,65 @@ class DME_Sheets
      * ブック内シート一覧と内容取得。
      *
      * @param string $spreadsheet_id スプレッドシートID。
+     * @param string $book_key       ブックキー。
      * @return array
      */
-    private static function load_book_sheets($spreadsheet_id)
+    private static function load_book_sheets($spreadsheet_id, $book_key = '')
     {
+        $worksheets_url = sprintf(
+            'https://spreadsheets.google.com/feeds/worksheets/%s/public/full?alt=json',
+            rawurlencode($spreadsheet_id)
+        );
+        self::debug_log('Worksheet discovery request', [
+            'book_key' => $book_key,
+            'spreadsheet_id' => $spreadsheet_id,
+            'worksheets_url' => $worksheets_url,
+        ]);
+
+        $worksheets_res = wp_remote_get($worksheets_url, ['timeout' => 15]);
+        if (is_wp_error($worksheets_res)) {
+            self::debug_log('Worksheet discovery failed', [
+                'book_key' => $book_key,
+                'spreadsheet_id' => $spreadsheet_id,
+                'worksheets_url' => $worksheets_url,
+                'error' => $worksheets_res->get_error_message(),
+            ]);
+        } else {
+            $worksheets_status = (int) wp_remote_retrieve_response_code($worksheets_res);
+            $worksheets_body = (string) wp_remote_retrieve_body($worksheets_res);
+            $worksheets_json = json_decode($worksheets_body, true);
+            $has_feed_entry = is_array($worksheets_json)
+                && !empty($worksheets_json['feed']['entry'])
+                && is_array($worksheets_json['feed']['entry']);
+            $feed_sheet_names = [];
+            if ($has_feed_entry) {
+                foreach ($worksheets_json['feed']['entry'] as $entry) {
+                    if (!empty($entry['title']['$t'])) {
+                        $feed_sheet_names[] = (string) $entry['title']['$t'];
+                    }
+                }
+            }
+
+            self::debug_log('Worksheet discovery response', [
+                'book_key' => $book_key,
+                'spreadsheet_id' => $spreadsheet_id,
+                'worksheets_url' => $worksheets_url,
+                'http_status' => $worksheets_status,
+                'body_head_500' => mb_substr($worksheets_body, 0, 500),
+                'has_feed_entry' => $has_feed_entry,
+                'sheet_names_from_feed' => $feed_sheet_names,
+            ]);
+        }
+
         $sheet_names = self::get_sheet_names($spreadsheet_id);
+        self::debug_log('Resolved sheet names', [
+            'book_key' => $book_key,
+            'spreadsheet_id' => $spreadsheet_id,
+            'sheet_names' => $sheet_names,
+        ]);
         if (empty($sheet_names)) {
             self::debug_log('No sheet names discovered', [
+                'book_key' => $book_key,
                 'spreadsheet_id' => $spreadsheet_id,
             ]);
             return [];
@@ -136,6 +188,7 @@ class DME_Sheets
                 rawurlencode($sheet_name)
             );
             self::debug_log('CSV request URL', [
+                'book_key' => $book_key,
                 'spreadsheet_id' => $spreadsheet_id,
                 'sheet_name' => $sheet_name,
                 'csv_url' => $csv_url,
@@ -144,8 +197,10 @@ class DME_Sheets
             $csv_res = wp_remote_get($csv_url, ['timeout' => 15]);
             if (is_wp_error($csv_res)) {
                 self::debug_log('CSV request failed', [
+                    'book_key' => $book_key,
                     'spreadsheet_id' => $spreadsheet_id,
                     'sheet_name' => $sheet_name,
+                    'csv_url' => $csv_url,
                     'error' => $csv_res->get_error_message(),
                 ]);
                 continue;
@@ -154,10 +209,12 @@ class DME_Sheets
             $status = (int) wp_remote_retrieve_response_code($csv_res);
             $body = (string) wp_remote_retrieve_body($csv_res);
             self::debug_log('CSV response', [
+                'book_key' => $book_key,
                 'spreadsheet_id' => $spreadsheet_id,
                 'sheet_name' => $sheet_name,
+                'csv_url' => $csv_url,
                 'http_status' => $status,
-                'body_head_300' => mb_substr($body, 0, 300),
+                'body_head_500' => mb_substr($body, 0, 500),
             ]);
 
             if ($status < 200 || $status >= 300) {
@@ -167,9 +224,23 @@ class DME_Sheets
             $rows = self::parse_csv($body);
             $row_blocks = self::split_row_blocks($rows);
             $total_blocks = count($row_blocks);
+            self::debug_log('CSV parse summary', [
+                'book_key' => $book_key,
+                'spreadsheet_id' => $spreadsheet_id,
+                'sheet_name' => $sheet_name,
+                'parse_csv_rows' => count($rows),
+                'split_row_blocks_count' => $total_blocks,
+            ]);
 
             foreach ($row_blocks as $block_index => $row_block) {
                 $normalized = self::normalize_price_table($sheet_name, $row_block);
+                self::debug_log('Normalization result', [
+                    'book_key' => $book_key,
+                    'spreadsheet_id' => $spreadsheet_id,
+                    'sheet_name' => $sheet_name,
+                    'block_index' => $block_index,
+                    'normalized_is_valid' => !empty($normalized),
+                ]);
                 if (empty($normalized)) {
                     continue;
                 }
@@ -183,6 +254,7 @@ class DME_Sheets
         }
 
         self::debug_log('Book load summary', [
+            'book_key' => $book_key,
             'spreadsheet_id' => $spreadsheet_id,
             'fetched_sheet_names' => $fetched_sheet_names,
             'normalized_valid_count' => $normalized_count,
