@@ -72,11 +72,27 @@ class DME_Sheets
             'updatedAt' => gmdate('c'),
         ];
 
+        $work_fee_row_count = 0;
+        foreach ($catalog['workFees'] as $sheet) {
+            $work_fee_row_count += !empty($sheet['rows']) && is_array($sheet['rows']) ? count($sheet['rows']) : 0;
+        }
+        $paper_weight_row_count = 0;
+        foreach ($catalog['paperWeights'] as $sheet) {
+            $paper_weight_row_count += !empty($sheet['rows']) && is_array($sheet['rows']) ? count($sheet['rows']) : 0;
+        }
+        $postage_row_count = 0;
+        foreach ($catalog['postage'] as $sheet) {
+            $postage_row_count += !empty($sheet['rows']) && is_array($sheet['rows']) ? count($sheet['rows']) : 0;
+        }
+
         self::debug_log('build_front_catalog result summary', [
             'printCatalog_count' => count($catalog['printCatalog']),
             'workFees_count' => count($catalog['workFees']),
+            'workFees_row_count' => $work_fee_row_count,
             'paperWeights_count' => count($catalog['paperWeights']),
+            'paperWeights_row_count' => $paper_weight_row_count,
             'postage_count' => count($catalog['postage']),
+            'postage_row_count' => $postage_row_count,
         ]);
 
         return $catalog;
@@ -286,7 +302,7 @@ class DME_Sheets
             ]);
 
             foreach ($row_blocks as $block_index => $row_block) {
-                $normalized = self::normalize_price_table($sheet_name, $row_block);
+                $normalized = self::normalize_by_book_key($book_key, $sheet_name, $row_block);
                 self::debug_log('Normalization result', [
                     'book_key' => $book_key,
                     'spreadsheet_id' => $spreadsheet_id,
@@ -567,11 +583,236 @@ class DME_Sheets
 
         return [
             'sheet_name' => $sheet_name,
+            'parser' => 'print_price',
             'conditions' => $conditions,
             'headers' => $headers,
             'quantities' => $quantities,
             'matrix' => $matrix,
         ];
+    }
+
+    /**
+     * ブックキーに応じた正規化ルーティング。
+     *
+     * @param string $book_key   ブックキー。
+     * @param string $sheet_name シート名。
+     * @param array  $rows       行配列。
+     * @return array
+     */
+    private static function normalize_by_book_key($book_key, $sheet_name, $rows)
+    {
+        $print_books = ['a4_offset', 'envelope_print', 'booklet', 'leaflet', 'pressure_dm', 'postcard'];
+        if (in_array($book_key, $print_books, true)) {
+            return self::normalize_price_table($sheet_name, $rows);
+        }
+
+        if ($book_key === 'dm_work') {
+            return self::normalize_dm_work_table($sheet_name, $rows);
+        }
+
+        if ($book_key === 'paper_weight') {
+            return self::normalize_paper_weight_table($sheet_name, $rows);
+        }
+
+        if ($book_key === 'postage') {
+            return self::normalize_postage_table($sheet_name, $rows);
+        }
+
+        return self::normalize_price_table($sheet_name, $rows);
+    }
+
+    /**
+     * DM作業費表を正規化。
+     *
+     * @param string $sheet_name シート名。
+     * @param array  $rows      行配列。
+     * @return array
+     */
+    private static function normalize_dm_work_table($sheet_name, $rows)
+    {
+        if (count($rows) < 2) {
+            return [];
+        }
+
+        $header_map = self::build_header_index_map($rows[0]);
+        $data_rows = array_slice($rows, 1);
+        $entries = [];
+        $by_code = [];
+
+        foreach ($data_rows as $row) {
+            $work_code = self::read_cell_by_header($row, $header_map, '作業コード', 0);
+            $work_name = self::read_cell_by_header($row, $header_map, '作業名', 1);
+            if ($work_code === '' && $work_name === '') {
+                continue;
+            }
+
+            $entry = [
+                'work_code' => $work_code,
+                'work_name' => $work_name,
+                'billing_type' => self::read_cell_by_header($row, $header_map, '課金タイプ', 2),
+                'unit_price' => self::to_int_price(self::read_cell_by_header($row, $header_map, '単価', 3)),
+                'basic_fee' => self::to_int_price(self::read_cell_by_header($row, $header_map, '基本料金', 4)),
+                'note' => self::read_cell_by_header($row, $header_map, '備考', 5),
+            ];
+            $entries[] = $entry;
+
+            if ($work_code !== '') {
+                $by_code[$work_code] = $entry;
+            }
+        }
+
+        if (empty($entries)) {
+            return [];
+        }
+
+        return [
+            'sheet_name' => $sheet_name,
+            'parser' => 'dm_work',
+            'rows' => $entries,
+            'by_code' => $by_code,
+        ];
+    }
+
+    /**
+     * 紙重量表を正規化。
+     *
+     * @param string $sheet_name シート名。
+     * @param array  $rows      行配列。
+     * @return array
+     */
+    private static function normalize_paper_weight_table($sheet_name, $rows)
+    {
+        if (count($rows) < 2) {
+            return [];
+        }
+
+        $header_map = self::build_header_index_map($rows[0]);
+        $data_rows = array_slice($rows, 1);
+        $entries = [];
+
+        foreach ($data_rows as $row) {
+            $weight_g = self::to_float_number(self::read_cell_by_header($row, $header_map, '重さ（g）', 5));
+            $entry = [
+                'type' => self::read_cell_by_header($row, $header_map, '種類', 0),
+                'size' => self::read_cell_by_header($row, $header_map, 'サイズ', 1),
+                'paper' => self::read_cell_by_header($row, $header_map, '紙質', 2),
+                'thickness' => self::read_cell_by_header($row, $header_map, '厚み', 3),
+                'tape' => self::read_cell_by_header($row, $header_map, 'テープ有無', 4),
+                'weight_g' => $weight_g,
+            ];
+
+            if ($entry['type'] === '' && $entry['size'] === '' && $entry['paper'] === '' && $entry['thickness'] === '') {
+                continue;
+            }
+
+            $entries[] = $entry;
+        }
+
+        if (empty($entries)) {
+            return [];
+        }
+
+        return [
+            'sheet_name' => $sheet_name,
+            'parser' => 'paper_weight',
+            'rows' => $entries,
+        ];
+    }
+
+    /**
+     * 郵便料金表を正規化。
+     *
+     * @param string $sheet_name シート名。
+     * @param array  $rows      行配列。
+     * @return array
+     */
+    private static function normalize_postage_table($sheet_name, $rows)
+    {
+        if (count($rows) < 2) {
+            return [];
+        }
+
+        $header_map = self::build_header_index_map($rows[0]);
+        $data_rows = array_slice($rows, 1);
+        $entries = [];
+        $by_size = [];
+
+        foreach ($data_rows as $row) {
+            $size = self::read_cell_by_header($row, $header_map, 'サイズ', 0);
+            $max_g = self::to_float_number(self::read_cell_by_header($row, $header_map, 'g以内', 1));
+            $fee = self::to_int_price(self::read_cell_by_header($row, $header_map, '料金', 2));
+
+            if ($size === '' || $fee === null) {
+                continue;
+            }
+
+            $entry = [
+                'size' => $size,
+                'max_g' => $max_g,
+                'fee' => $fee,
+            ];
+            $entries[] = $entry;
+            if (!isset($by_size[$size])) {
+                $by_size[$size] = [];
+            }
+            $by_size[$size][] = $entry;
+        }
+
+        foreach ($by_size as $size => $list) {
+            usort($list, function ($a, $b) {
+                return ($a['max_g'] <=> $b['max_g']);
+            });
+            $by_size[$size] = $list;
+        }
+
+        if (empty($entries)) {
+            return [];
+        }
+
+        return [
+            'sheet_name' => $sheet_name,
+            'parser' => 'postage',
+            'rows' => $entries,
+            'by_size' => $by_size,
+        ];
+    }
+
+    /**
+     * ヘッダー名 => インデックス変換。
+     *
+     * @param array $header_row ヘッダー行。
+     * @return array
+     */
+    private static function build_header_index_map($header_row)
+    {
+        $map = [];
+        foreach ((array) $header_row as $index => $label) {
+            $trimmed = trim((string) $label);
+            if ($trimmed !== '') {
+                $map[$trimmed] = (int) $index;
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * ヘッダー名優先でセル値を取得。
+     *
+     * @param array  $row        データ行。
+     * @param array  $header_map ヘッダーマップ。
+     * @param string $header     ヘッダー名。
+     * @param int    $fallback   フォールバック列。
+     * @return string
+     */
+    private static function read_cell_by_header($row, $header_map, $header, $fallback)
+    {
+        $index = isset($header_map[$header]) ? (int) $header_map[$header] : (int) $fallback;
+        if (!isset($row[$index])) {
+            return '';
+        }
+
+        return trim((string) $row[$index]);
     }
 
     /**
@@ -611,5 +852,24 @@ class DME_Sheets
         }
 
         return (int) round((float) $num);
+    }
+
+    /**
+     * 数値文字列をfloatへ変換。
+     *
+     * @param mixed $value 値。
+     * @return float|null
+     */
+    private static function to_float_number($value)
+    {
+        if ($value === '' || $value === null) {
+            return null;
+        }
+        $num = preg_replace('/[^0-9.-]/', '', (string) $value);
+        if ($num === '' || !is_numeric($num)) {
+            return null;
+        }
+
+        return (float) $num;
     }
 }

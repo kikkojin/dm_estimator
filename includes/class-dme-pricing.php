@@ -249,9 +249,43 @@ class DME_Pricing
         if (empty($catalog['workFees'])) {
             return null;
         }
+
+        $aliases = [$keyword];
+        if ($keyword === '発送基本料金') {
+            $aliases[] = 'hassou_kihon';
+            $aliases[] = '発送関連作業基本料金';
+        }
+
         foreach ($catalog['workFees'] as $sheet) {
+            if (!empty($sheet['rows']) && is_array($sheet['rows'])) {
+                // 1) 作業コード一致 2) 作業名一致（完全） 3) 作業名部分一致 の順で探索。
+                foreach ($aliases as $alias) {
+                    foreach ($sheet['rows'] as $row) {
+                        if (!is_array($row)) {
+                            continue;
+                        }
+
+                        $code = isset($row['work_code']) ? (string) $row['work_code'] : '';
+                        $name = isset($row['work_name']) ? (string) $row['work_name'] : '';
+                        $is_match = ($code !== '' && $code === $alias)
+                            || ($name !== '' && $name === $alias)
+                            || ($name !== '' && mb_strpos($name, $alias) !== false);
+                        if (!$is_match) {
+                            continue;
+                        }
+
+                        if (isset($row['basic_fee']) && is_numeric($row['basic_fee'])) {
+                            return (int) $row['basic_fee'];
+                        }
+                        if (isset($row['unit_price']) && is_numeric($row['unit_price'])) {
+                            return (int) $row['unit_price'];
+                        }
+                    }
+                }
+            }
+
             $name = isset($sheet['sheet_name']) ? $sheet['sheet_name'] : '';
-            if (mb_strpos($name, $keyword) !== false) {
+            if (mb_strpos($name, $keyword) !== false && !empty($sheet['matrix']) && is_array($sheet['matrix'])) {
                 foreach ($sheet['matrix'] as $row) {
                     foreach ($row as $price) {
                         if (is_numeric($price)) {
@@ -269,16 +303,75 @@ class DME_Pricing
         if (empty($catalog['postage'])) {
             return null;
         }
-        // 現時点では郵便料金表の最小有効価格を返す簡易実装。
-        // 将来は重量計算値に基づく段階選択へ差し替える。
+
+        $target_size = '';
+        if (!empty($payload['reply']['size'])) {
+            $target_size = (string) $payload['reply']['size'];
+        } elseif (!empty($payload['envelope']['size'])) {
+            $target_size = (string) $payload['envelope']['size'];
+        }
+
+        $target_weight = 0.0;
+        if (isset($payload['reply']['weightG']) && is_numeric($payload['reply']['weightG'])) {
+            $target_weight = (float) $payload['reply']['weightG'];
+        } elseif (isset($payload['totalWeightG']) && is_numeric($payload['totalWeightG'])) {
+            $target_weight = (float) $payload['totalWeightG'];
+        } elseif (isset($payload['estimatedWeightG']) && is_numeric($payload['estimatedWeightG'])) {
+            $target_weight = (float) $payload['estimatedWeightG'];
+        }
+
         $lowest = null;
         foreach ($catalog['postage'] as $sheet) {
-            foreach ($sheet['matrix'] as $row) {
-                foreach ($row as $price) {
-                    if (is_numeric($price)) {
-                        $price = (int) $price;
-                        if ($price > 0 && ($lowest === null || $price < $lowest)) {
-                            $lowest = $price;
+            if (!empty($sheet['rows']) && is_array($sheet['rows'])) {
+                $rows = $sheet['rows'];
+                if ($target_size !== '') {
+                    $size_rows = array_values(array_filter($rows, function ($row) use ($target_size) {
+                        if (empty($row['size'])) {
+                            return false;
+                        }
+                        $size = (string) $row['size'];
+                        return $size === $target_size || mb_strpos($size, $target_size) !== false || mb_strpos($target_size, $size) !== false;
+                    }));
+                    if (!empty($size_rows)) {
+                        $rows = $size_rows;
+                    }
+                }
+
+                usort($rows, function ($a, $b) {
+                    return ((float) ($a['max_g'] ?? 0)) <=> ((float) ($b['max_g'] ?? 0));
+                });
+
+                $selected = null;
+                foreach ($rows as $row) {
+                    if (!isset($row['fee']) || !is_numeric($row['fee'])) {
+                        continue;
+                    }
+                    $max_g = isset($row['max_g']) && is_numeric($row['max_g']) ? (float) $row['max_g'] : 0.0;
+                    if ($target_weight > 0 && $max_g > 0 && $target_weight <= $max_g) {
+                        $selected = (int) $row['fee'];
+                        break;
+                    }
+                    if ($target_weight <= 0 && $selected === null) {
+                        $selected = (int) $row['fee'];
+                    }
+                    if ($target_weight > 0) {
+                        $selected = (int) $row['fee']; // 上限超過時のフォールバックとして最後の段を保持
+                    }
+                }
+
+                if ($selected !== null) {
+                    return $selected;
+                }
+            }
+
+            if (!empty($sheet['matrix']) && is_array($sheet['matrix'])) {
+                foreach ($sheet['matrix'] as $row) {
+                    foreach ($row as $price) {
+                        if (is_numeric($price)) {
+                            $price = (int) $price;
+                            if ($price > 0 && ($lowest === null || $price < $lowest)) {
+                                $lowest = $price;
+                            }
                         }
                     }
                 }
