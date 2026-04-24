@@ -86,11 +86,13 @@ class DME_Sheets
      */
     public static function get_all_books()
     {
-        $cache_key = 'dme_sheet_books_v1';
+        $cache_key = 'dme_sheet_books_v2';
         $cached = get_transient($cache_key);
         if (is_array($cached)) {
+            self::debug_log('Cache hit');
             return $cached;
         }
+        self::debug_log('Cache miss; loading sheets');
 
         $output = [];
         foreach (self::SHEET_BOOKS as $book_key => $spreadsheet_id) {
