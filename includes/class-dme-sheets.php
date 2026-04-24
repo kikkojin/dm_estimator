@@ -133,7 +133,7 @@ class DME_Sheets
         }
 
         if (!self::has_any_price_data($output)) {
-            self::debug_log('Fetch result was empty; skipped transient save');
+            self::debug_log('Fetch result was empty; skipped transient save', [], 'warning');
             return $output;
         }
 
@@ -228,7 +228,7 @@ class DME_Sheets
     private static function load_book_sheets($spreadsheet_id, $book_key = '')
     {
         $sheet_names = self::get_sheet_names($spreadsheet_id);
-        self::debug_log('Resolved sheet names', [
+        self::verbose_log('Resolved sheet names', [
             'book_key' => $book_key,
             'spreadsheet_id' => $spreadsheet_id,
             'sheet_names' => $sheet_names,
@@ -237,7 +237,7 @@ class DME_Sheets
             self::debug_log('No sheet names discovered', [
                 'book_key' => $book_key,
                 'spreadsheet_id' => $spreadsheet_id,
-            ]);
+            ], 'warning');
             return [];
         }
 
@@ -256,7 +256,7 @@ class DME_Sheets
                 rawurlencode($spreadsheet_id),
                 rawurlencode($sheet_name)
             );
-            self::debug_log('CSV request URL', [
+            self::verbose_log('CSV request URL', [
                 'book_key' => $book_key,
                 'spreadsheet_id' => $spreadsheet_id,
                 'sheet_name' => $sheet_name,
@@ -269,41 +269,63 @@ class DME_Sheets
                     'book_key' => $book_key,
                     'spreadsheet_id' => $spreadsheet_id,
                     'sheet_name' => $sheet_name,
-                    'csv_url' => $csv_url,
                     'error' => $csv_res->get_error_message(),
-                ]);
+                ], 'error');
                 continue;
             }
 
             $status = (int) wp_remote_retrieve_response_code($csv_res);
             $body = (string) wp_remote_retrieve_body($csv_res);
-            self::debug_log('CSV response', [
+            self::verbose_log('CSV response', [
                 'book_key' => $book_key,
                 'spreadsheet_id' => $spreadsheet_id,
                 'sheet_name' => $sheet_name,
                 'csv_url' => $csv_url,
                 'http_status' => $status,
-                'body_head_500' => mb_substr($body, 0, 500),
+                'body_head_300' => mb_substr($body, 0, 300),
             ]);
 
             if ($status < 200 || $status >= 300) {
+                self::debug_log('CSV response status is not 2xx', [
+                    'book_key' => $book_key,
+                    'spreadsheet_id' => $spreadsheet_id,
+                    'sheet_name' => $sheet_name,
+                    'http_status' => $status,
+                ], 'error');
                 continue;
             }
 
             $rows = self::parse_csv($body);
+            if (count($rows) === 0) {
+                self::debug_log('CSV parse produced zero rows', [
+                    'book_key' => $book_key,
+                    'spreadsheet_id' => $spreadsheet_id,
+                    'sheet_name' => $sheet_name,
+                ], 'error');
+                continue;
+            }
             $row_blocks = self::split_row_blocks($rows);
             $total_blocks = count($row_blocks);
-            self::debug_log('CSV parse summary', [
+            self::verbose_log('CSV parse summary', [
                 'book_key' => $book_key,
                 'spreadsheet_id' => $spreadsheet_id,
                 'sheet_name' => $sheet_name,
                 'parse_csv_rows' => count($rows),
                 'split_row_blocks_count' => $total_blocks,
             ]);
+            if ($total_blocks === 0) {
+                self::debug_log('CSV parse produced zero row blocks', [
+                    'book_key' => $book_key,
+                    'spreadsheet_id' => $spreadsheet_id,
+                    'sheet_name' => $sheet_name,
+                ], 'error');
+                continue;
+            }
 
+            $sheet_normalized_count = 0;
             foreach ($row_blocks as $block_index => $row_block) {
                 $normalized = self::normalize_by_book_key($book_key, $sheet_name, $row_block);
-                self::debug_log('Normalization result', [
+                self::verbose_log('Normalization result', [
                     'book_key' => $book_key,
                     'spreadsheet_id' => $spreadsheet_id,
                     'sheet_name' => $sheet_name,
@@ -314,15 +336,24 @@ class DME_Sheets
                     continue;
                 }
                 $normalized_count++;
+                $sheet_normalized_count++;
 
                 if ($total_blocks > 1) {
                     $normalized['sheet_name'] = sprintf('%s [%d]', $sheet_name, $block_index + 1);
                 }
                 $sheets[] = $normalized;
             }
+
+            if ($sheet_normalized_count === 0) {
+                self::debug_log('Normalization result is empty for sheet', [
+                    'book_key' => $book_key,
+                    'spreadsheet_id' => $spreadsheet_id,
+                    'sheet_name' => $sheet_name,
+                ], 'warning');
+            }
         }
 
-        self::debug_log('Book load summary', [
+        self::verbose_log('Book load summary', [
             'book_key' => $book_key,
             'spreadsheet_id' => $spreadsheet_id,
             'fetched_sheet_names' => $fetched_sheet_names,
@@ -354,9 +385,9 @@ class DME_Sheets
             rawurlencode($spreadsheet_id),
             rawurlencode($api_key)
         );
-        self::debug_log('V4 sheet-list request URL', [
+        self::verbose_log('V4 sheet-list request URL', [
             'spreadsheet_id' => $spreadsheet_id,
-            'url' => $v4_url,
+            'url' => self::mask_sensitive_url($v4_url),
         ]);
 
         $res = wp_remote_get($v4_url, ['timeout' => 15]);
@@ -364,24 +395,31 @@ class DME_Sheets
             self::debug_log('V4 sheet-list request failed', [
                 'spreadsheet_id' => $spreadsheet_id,
                 'error' => $res->get_error_message(),
-            ]);
+            ], 'error');
             return [];
         }
 
         $status = (int) wp_remote_retrieve_response_code($res);
         $body = (string) wp_remote_retrieve_body($res);
-        self::debug_log('V4 sheet-list response', [
+        self::verbose_log('V4 sheet-list response', [
             'spreadsheet_id' => $spreadsheet_id,
             'http_status' => $status,
             'body_head_300' => mb_substr($body, 0, 300),
         ]);
 
         if ($status < 200 || $status >= 300) {
+            self::debug_log('V4 sheet-list response status is not 2xx', [
+                'spreadsheet_id' => $spreadsheet_id,
+                'http_status' => $status,
+            ], 'error');
             return [];
         }
 
         $json = json_decode($body, true);
         if (!is_array($json) || empty($json['sheets']) || !is_array($json['sheets'])) {
+            self::debug_log('V4 sheet-list response has no sheets', [
+                'spreadsheet_id' => $spreadsheet_id,
+            ], 'error');
             return [];
         }
 
@@ -392,7 +430,7 @@ class DME_Sheets
             }
         }
 
-        self::debug_log('V4 discovered sheet names', [
+        self::verbose_log('V4 discovered sheet names', [
             'spreadsheet_id' => $spreadsheet_id,
             'sheet_names' => $sheet_names,
         ]);
@@ -431,7 +469,7 @@ class DME_Sheets
         }
         self::$missing_api_key_warned = true;
 
-        self::debug_log('Google Sheets API Key is missing. Set it in Settings > DM Estimator to enable sheet discovery.', $context);
+        self::debug_log('Google Sheets API Key is missing. Set it in Settings > DM Estimator to enable sheet discovery.', $context, 'error');
     }
 
     /**
@@ -439,15 +477,20 @@ class DME_Sheets
      *
      * @param string $message メッセージ。
      * @param array  $context 補足情報。
+     * @param string $level   ログレベル。
      * @return void
      */
-    private static function debug_log($message, $context = [])
+    private static function debug_log($message, $context = [], $level = 'info')
     {
         if (!(defined('WP_DEBUG') && WP_DEBUG)) {
             return;
         }
+        if ($level === 'verbose' && !self::is_verbose_log_enabled()) {
+            return;
+        }
 
-        $prefix = '[DME_Sheets] ';
+        $context = self::sanitize_log_context($context);
+        $prefix = '[DME_Sheets][' . strtoupper((string) $level) . '] ';
         $line = $prefix . $message;
         if (!empty($context)) {
             $json = wp_json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -457,6 +500,75 @@ class DME_Sheets
         }
 
         error_log($line);
+    }
+
+    /**
+     * 詳細ログ専用ヘルパー。
+     *
+     * @param string $message メッセージ。
+     * @param array  $context 補足情報。
+     * @return void
+     */
+    private static function verbose_log($message, $context = [])
+    {
+        self::debug_log($message, $context, 'verbose');
+    }
+
+    /**
+     * 詳細ログを有効化しているか判定。
+     *
+     * @return bool
+     */
+    private static function is_verbose_log_enabled()
+    {
+        if (!class_exists('DME_Admin') || !method_exists('DME_Admin', 'is_verbose_log_enabled')) {
+            return false;
+        }
+
+        return DME_Admin::is_verbose_log_enabled();
+    }
+
+    /**
+     * ログ文脈内の機密情報をマスクする。
+     *
+     * @param mixed $context ログ文脈。
+     * @return mixed
+     */
+    private static function sanitize_log_context($context)
+    {
+        if (is_array($context)) {
+            $sanitized = [];
+            foreach ($context as $key => $value) {
+                if (is_string($value) && stripos((string) $key, 'url') !== false) {
+                    $sanitized[$key] = self::mask_sensitive_url($value);
+                    continue;
+                }
+                if (is_string($key) && in_array(strtolower($key), ['api_key', 'google_api_key', 'key'], true)) {
+                    $sanitized[$key] = '***';
+                    continue;
+                }
+                $sanitized[$key] = self::sanitize_log_context($value);
+            }
+
+            return $sanitized;
+        }
+
+        return $context;
+    }
+
+    /**
+     * URL内のAPIキーをマスクする。
+     *
+     * @param string $url URL。
+     * @return string
+     */
+    private static function mask_sensitive_url($url)
+    {
+        if (!is_string($url) || $url === '') {
+            return (string) $url;
+        }
+
+        return (string) preg_replace('/([?&]key=)[^&]*/i', '$1***', $url);
     }
 
     /**

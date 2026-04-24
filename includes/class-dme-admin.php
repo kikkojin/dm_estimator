@@ -53,6 +53,7 @@ class DME_Admin
                 'recipient_email' => get_option('admin_email'),
                 'google_api_key' => '',
                 'disable_price_cache' => 0,
+                'enable_verbose_log' => 0,
             ],
         ]);
 
@@ -81,6 +82,14 @@ class DME_Admin
             'dme-settings',
             'dme_main_section'
         );
+
+        add_settings_field(
+            'enable_verbose_log',
+            'ログ設定',
+            [__CLASS__, 'render_enable_verbose_log_field'],
+            'dme-settings',
+            'dme_main_section'
+        );
     }
 
     /**
@@ -96,6 +105,7 @@ class DME_Admin
             'recipient_email' => isset($input['recipient_email']) ? sanitize_email($input['recipient_email']) : '',
             'google_api_key' => isset($input['google_api_key']) ? sanitize_text_field($input['google_api_key']) : '',
             'disable_price_cache' => empty($input['disable_price_cache']) ? 0 : 1,
+            'enable_verbose_log' => empty($input['enable_verbose_log']) ? 0 : 1,
         ];
 
         $api_key_changed = (string) ($current['google_api_key'] ?? '') !== $next['google_api_key'];
@@ -152,6 +162,24 @@ class DME_Admin
             価格表キャッシュを無効化する（開発・確認用）
         </label>
         <p class="description">チェック中は、価格表データをキャッシュせず、ページ表示ごとにGoogleスプレッドシートから再取得します。通常運用ではOFFにしてください。</p>
+        <?php
+    }
+
+    /**
+     * 詳細ログ設定チェックボックス描画。
+     *
+     * @return void
+     */
+    public static function render_enable_verbose_log_field()
+    {
+        $settings = get_option(self::OPTION_KEY, []);
+        $checked = !empty($settings['enable_verbose_log']);
+        ?>
+        <label>
+            <input type="checkbox" name="<?php echo esc_attr(self::OPTION_KEY); ?>[enable_verbose_log]" value="1" <?php checked($checked); ?> />
+            詳細ログを出力する（開発・調査用）
+        </label>
+        <p class="description">チェック中は、Google Sheets API のレスポンス先頭、CSV取得URL、CSV本文先頭、各シートのパース結果などを debug.log に出力します。ログが大きくなるため通常運用ではOFFにしてください。</p>
         <?php
     }
 
@@ -232,6 +260,17 @@ class DME_Admin
     {
         $settings = get_option(self::OPTION_KEY, []);
         return !empty($settings['disable_price_cache']);
+    }
+
+    /**
+     * 詳細ログ出力設定。
+     *
+     * @return bool
+     */
+    public static function is_verbose_log_enabled()
+    {
+        $settings = get_option(self::OPTION_KEY, []);
+        return !empty($settings['enable_verbose_log']);
     }
 
     /**
