@@ -85,14 +85,14 @@ class DME_Sheets
             $postage_row_count += !empty($sheet['rows']) && is_array($sheet['rows']) ? count($sheet['rows']) : 0;
         }
 
-        self::debug_log('build_front_catalog result summary', [
-            'printCatalog_count' => count($catalog['printCatalog']),
-            'workFees_count' => count($catalog['workFees']),
-            'workFees_row_count' => $work_fee_row_count,
-            'paperWeights_count' => count($catalog['paperWeights']),
-            'paperWeights_row_count' => $paper_weight_row_count,
-            'postage_count' => count($catalog['postage']),
-            'postage_row_count' => $postage_row_count,
+        self::debug_log('価格表データ取得結果', [
+            '印刷料金表' => count($catalog['printCatalog']),
+            'DM作業費表シート数' => count($catalog['workFees']),
+            'DM作業費行数' => $work_fee_row_count,
+            '紙重量表シート数' => count($catalog['paperWeights']),
+            '紙重量行数' => $paper_weight_row_count,
+            '郵便料金表シート数' => count($catalog['postage']),
+            '郵便料金行数' => $postage_row_count,
         ]);
 
         return $catalog;
@@ -109,15 +109,15 @@ class DME_Sheets
         $cache_key = self::CACHE_KEY;
 
         if ($disable_cache) {
-            self::debug_log('disable_price_cache is ON; bypassing transient cache');
-            self::clear_books_cache('disable_price_cache is enabled');
+            self::debug_log('価格表キャッシュ無効化中のため、スプレッドシートから再取得します');
+            self::clear_books_cache('価格表キャッシュ無効化中');
         } else {
             $cached = get_transient($cache_key);
             if (is_array($cached)) {
-                self::debug_log('Cache hit');
+                self::debug_log('価格表キャッシュを使用しました');
                 return $cached;
             }
-            self::debug_log('Cache miss; loading sheets');
+            self::debug_log('価格表キャッシュが見つからないため、スプレッドシートから再取得します');
         }
 
         $output = [];
@@ -133,7 +133,7 @@ class DME_Sheets
         }
 
         if (!self::has_any_price_data($output)) {
-            self::debug_log('Fetch result was empty; skipped transient save', [], 'warning');
+            self::debug_log('価格表データが空のため、キャッシュ保存しませんでした', [], 'warning');
             return $output;
         }
 
@@ -212,9 +212,9 @@ class DME_Sheets
             );
         }
 
-        self::debug_log('Cleared price cache transients', [
-            'prefix' => self::CACHE_KEY_PREFIX,
-            'reason' => (string) $reason,
+        self::debug_log('価格表キャッシュを削除しました', [
+            'プレフィックス' => self::CACHE_KEY_PREFIX,
+            '理由' => (string) $reason,
         ]);
     }
 
@@ -469,7 +469,7 @@ class DME_Sheets
         }
         self::$missing_api_key_warned = true;
 
-        self::debug_log('Google Sheets API Key is missing. Set it in Settings > DM Estimator to enable sheet discovery.', $context, 'error');
+        self::debug_log('Google Sheets API Key が未設定です。設定 > DM Estimator で設定してください。', $context, 'error');
     }
 
     /**
@@ -490,8 +490,8 @@ class DME_Sheets
         }
 
         $context = self::sanitize_log_context($context);
-        $prefix = '[DME_Sheets][' . strtoupper((string) $level) . '] ';
-        $line = $prefix . $message;
+        $prefix = '[DME_Sheets][' . self::localize_log_level($level) . '] ';
+        $line = $prefix . self::localize_log_message($message);
         if (!empty($context)) {
             $json = wp_json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             if (is_string($json) && $json !== '') {
@@ -512,6 +512,66 @@ class DME_Sheets
     private static function verbose_log($message, $context = [])
     {
         self::debug_log($message, $context, 'verbose');
+    }
+
+    /**
+     * ログレベルを日本語表記へ変換。
+     *
+     * @param string $level ログレベル。
+     * @return string
+     */
+    private static function localize_log_level($level)
+    {
+        $map = [
+            'info' => '情報',
+            'warning' => '警告',
+            'error' => 'エラー',
+            'debug' => '詳細',
+            'verbose' => '詳細',
+        ];
+        $key = strtolower((string) $level);
+
+        return isset($map[$key]) ? $map[$key] : strtoupper((string) $level);
+    }
+
+    /**
+     * 既存英語ログメッセージを日本語へ変換。
+     *
+     * @param string $message ログメッセージ。
+     * @return string
+     */
+    private static function localize_log_message($message)
+    {
+        $map = [
+            'Cache hit' => '価格表キャッシュを使用しました',
+            'Cache miss; loading sheets' => '価格表キャッシュが見つからないため、スプレッドシートから再取得します',
+            'Cache disabled; loading sheets' => '価格表キャッシュ無効化中のため、スプレッドシートから再取得します',
+            'Cleared price cache transients' => '価格表キャッシュを削除しました',
+            'build_front_catalog result summary' => '価格表データ取得結果',
+            'Empty catalog; not caching' => '価格表データが空のため、キャッシュ保存しませんでした',
+            'disable_price_cache is ON; bypassing transient cache' => '価格表キャッシュ無効化中のため、スプレッドシートから再取得します',
+            'Fetch result was empty; skipped transient save' => '価格表データが空のため、キャッシュ保存しませんでした',
+            'Resolved sheet names' => 'シート名を解決しました',
+            'No sheet names discovered' => 'シート名を取得できませんでした',
+            'CSV request URL' => 'CSV取得URL',
+            'CSV request failed' => 'CSV取得に失敗しました',
+            'CSV response' => 'CSVレスポンス',
+            'CSV response status is not 2xx' => 'CSVレスポンスが異常ステータスです',
+            'CSV parse produced zero rows' => 'CSV解析結果が0行でした',
+            'CSV parse summary' => 'CSV解析結果サマリー',
+            'CSV parse produced zero row blocks' => 'CSV解析結果の有効ブロックが0件でした',
+            'Normalization result' => '正規化結果',
+            'Normalization result is empty for sheet' => 'シートの正規化結果が空でした',
+            'Book load summary' => 'ブック読み込みサマリー',
+            'V4 sheet-list request URL' => 'V4シート一覧取得URL',
+            'V4 sheet-list request failed' => 'V4シート一覧取得に失敗しました',
+            'V4 sheet-list response' => 'V4シート一覧レスポンス',
+            'V4 sheet-list response status is not 2xx' => 'V4シート一覧レスポンスが異常ステータスです',
+            'V4 sheet-list response has no sheets' => 'V4シート一覧レスポンスにシート情報がありません',
+            'V4 discovered sheet names' => 'V4で検出したシート名',
+        ];
+
+        return isset($map[$message]) ? $map[$message] : (string) $message;
     }
 
     /**
