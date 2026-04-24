@@ -111,7 +111,7 @@ class DME_Admin
         $api_key_changed = (string) ($current['google_api_key'] ?? '') !== $next['google_api_key'];
         $disable_cache_changed = (int) ($current['disable_price_cache'] ?? 0) !== (int) $next['disable_price_cache'];
         if ($api_key_changed || $disable_cache_changed) {
-            DME_Sheets::clear_books_cache('Settings updated: API key or disable_price_cache changed');
+            DME_Sheets::clear_books_cache('設定変更により削除');
         }
 
         return $next;
@@ -286,7 +286,7 @@ class DME_Admin
 
         check_admin_referer('dme_delete_price_cache_action', 'dme_delete_price_cache_nonce');
 
-        DME_Sheets::clear_books_cache('Manual clear from admin settings');
+        DME_Sheets::clear_books_cache('管理画面から手動削除');
 
         $redirect_url = add_query_arg(
             [
