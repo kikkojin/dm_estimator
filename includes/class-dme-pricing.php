@@ -30,7 +30,7 @@ class DME_Pricing
         }
 
         // 基本作業費。
-        $basic_fee = self::find_work_fee($catalog, '発送基本料金');
+        $basic_fee = self::find_work_fee_by_code($catalog, 'hassou_kihon');
         if ($basic_fee === null) {
             $errors[] = '発送基本料金を取得できません。';
         } else {
@@ -63,8 +63,8 @@ class DME_Pricing
 
         // 封入作業費。
         if ($content_count > 0 && $ship_count > 0) {
-            $insert_base = self::find_work_fee($catalog, '封入1点目');
-            $insert_additional = self::find_work_fee($catalog, '封入追加');
+            $insert_base = self::find_work_fee_by_code($catalog, 'funyuu_1');
+            $insert_additional = self::find_work_fee_by_code($catalog, 'funyuu_add');
 
             if ($insert_base !== null) {
                 $items[] = self::make_item('封入作業（1点目）', $insert_base, $ship_count, '部数分');
@@ -77,17 +77,22 @@ class DME_Pricing
         // 返信方法。
         $reply_mode = isset($payload['replyMode']) ? (string) $payload['replyMode'] : 'stamp';
         if ($reply_mode === 'stamp') {
-            $stamp_fee = self::find_work_fee($catalog, '切手貼代');
+            $stamp_fee = self::find_work_fee_by_code($catalog, 'kitte');
             $postage = self::find_postage_fee($catalog, $payload);
-            if ($stamp_fee === null || $postage === null) {
-                $errors[] = '返信用の切手関連費用を算出できません。';
-            } else {
+            if ($stamp_fee === null) {
+                $errors[] = '切手貼代を取得できません。';
+            }
+            if ($postage === null) {
+                $errors[] = '返信郵便料金を算出できません。';
+            }
+            if ($stamp_fee !== null && $postage !== null) {
                 $items[] = self::make_item('切手貼代', $stamp_fee, $ship_count, '返信方法: 切手');
                 $items[] = self::make_item('返信郵便料金', $postage, $ship_count, '重量計算ベース');
             }
         } else {
             $items[] = self::make_item('受取人払い', 0, 1, '料金は個別見積');
             if (!empty($payload['reply']['delegate'])) {
+                // TODO: 申請代行の作業コード確定後は find_work_fee_by_code() に切り替える。
                 $delegate_fee = self::find_work_fee($catalog, '申請代行');
                 if ($delegate_fee !== null) {
                     $items[] = self::make_item('受取人払い申請代行', $delegate_fee, 1, 'オプション');
@@ -97,6 +102,7 @@ class DME_Pricing
 
         // アンケート発送で封筒デザイン依頼あり。
         if (!empty($payload['envelopeDesignRequest']) && $payload['envelopeDesignRequest'] === true) {
+            // TODO: 封筒デザイン依頼の作業コード確定後は find_work_fee_by_code() に切り替える。
             $design_fee = self::find_work_fee($catalog, '封筒デザイン依頼');
             if ($design_fee !== null) {
                 $items[] = self::make_item('封筒デザイン依頼', $design_fee, 1, 'アンケート向け追加');
@@ -131,11 +137,12 @@ class DME_Pricing
         }
 
         if ($mode === 'clear') {
-            $clear_fee = self::find_work_fee($catalog, '透明封筒');
+            $clear_work_code = self::pick_clear_envelope_work_code($envelope, $catalog);
+            $clear_fee = self::find_work_fee_by_code($catalog, $clear_work_code);
             if ($clear_fee === null) {
                 return ['item' => null, 'error' => '透明封筒の料金を取得できません。'];
             }
-            return ['item' => self::make_item('透明封筒', $clear_fee, $count, 'DM作業費より'), 'error' => null];
+            return ['item' => self::make_item('透明封筒', $clear_fee, $count, 'DM作業費より(' . $clear_work_code . ')'), 'error' => null];
         }
 
         $query = [
@@ -296,6 +303,125 @@ class DME_Pricing
             }
         }
         return null;
+    }
+
+    private static function find_work_row_by_code($catalog, $work_code, $log_missing = true)
+    {
+        if (empty($catalog['workFees']) || !is_array($catalog['workFees'])) {
+            if ($log_missing) {
+                self::debug_log('作業費コードが見つかりません', ['作業コード' => $work_code], 'warning');
+            }
+            return null;
+        }
+
+        foreach ($catalog['workFees'] as $sheet) {
+            if (!is_array($sheet)) {
+                continue;
+            }
+
+            if (!empty($sheet['by_code']) && is_array($sheet['by_code']) && isset($sheet['by_code'][$work_code]) && is_array($sheet['by_code'][$work_code])) {
+                return $sheet['by_code'][$work_code];
+            }
+
+            if (empty($sheet['rows']) || !is_array($sheet['rows'])) {
+                continue;
+            }
+
+            foreach ($sheet['rows'] as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $code = isset($row['work_code']) ? (string) $row['work_code'] : '';
+                if ($code !== '' && $code === $work_code) {
+                    return $row;
+                }
+            }
+        }
+
+        if ($log_missing) {
+            self::debug_log('作業費コードが見つかりません', ['作業コード' => $work_code], 'warning');
+        }
+        return null;
+    }
+
+    private static function get_work_unit_price($row)
+    {
+        if (!is_array($row) || !isset($row['unit_price']) || !is_numeric($row['unit_price'])) {
+            return null;
+        }
+        return (int) $row['unit_price'];
+    }
+
+    private static function get_work_basic_fee($row)
+    {
+        if (!is_array($row) || !isset($row['basic_fee']) || !is_numeric($row['basic_fee'])) {
+            return null;
+        }
+        return (int) $row['basic_fee'];
+    }
+
+    private static function find_work_fee_by_code($catalog, $work_code)
+    {
+        $row = self::find_work_row_by_code($catalog, $work_code);
+        if ($row !== null) {
+            // DM作業費表の運用上、見積で使用する作業費は原則「単価」を採用する。
+            // 例: hassou_kihon は fixed でも単価(20000)を発送基本料金として使う。
+            $unit_price = self::get_work_unit_price($row);
+            if ($unit_price !== null) {
+                return $unit_price;
+            }
+
+            $basic_fee = self::get_work_basic_fee($row);
+            if ($basic_fee !== null) {
+                return $basic_fee;
+            }
+        }
+
+        self::debug_log('作業費コード検索に失敗したため互換検索にフォールバックします', ['作業コード' => $work_code], 'warning');
+        return self::find_work_fee($catalog, $work_code);
+    }
+
+    private static function pick_clear_envelope_work_code($envelope, $catalog)
+    {
+        $size = isset($envelope['size']) ? (string) $envelope['size'] : '';
+        if ($size !== '') {
+            if (mb_strpos($size, '定型') !== false || mb_strpos(mb_strtolower($size), 'tei') !== false) {
+                return 'toumei_tei';
+            }
+            if (mb_strpos(mb_strtoupper($size), 'A4') !== false) {
+                return 'toumei_a4';
+            }
+        }
+
+        // サイズ判定が曖昧な入力は、暫定的に A4 優先で探索し、見つからなければ定型へフォールバック。
+        if (self::find_work_row_by_code($catalog, 'toumei_a4', false) !== null) {
+            return 'toumei_a4';
+        }
+        return 'toumei_tei';
+    }
+
+    private static function debug_log($message, $context = [], $level = 'info')
+    {
+        if (!(defined('WP_DEBUG') && WP_DEBUG)) {
+            return;
+        }
+
+        $level_map = [
+            'info' => '情報',
+            'warning' => '警告',
+            'error' => 'エラー',
+            'debug' => '詳細',
+        ];
+        $localized_level = isset($level_map[$level]) ? $level_map[$level] : strtoupper((string) $level);
+        $line = '[DME_Pricing][' . $localized_level . '] ' . (string) $message;
+        if (!empty($context)) {
+            $json = wp_json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            if (is_string($json) && $json !== '') {
+                $line .= ' ' . $json;
+            }
+        }
+
+        error_log($line);
     }
 
     private static function find_postage_fee($catalog, $payload)
