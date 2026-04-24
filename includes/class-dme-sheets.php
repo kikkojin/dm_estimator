@@ -10,6 +10,11 @@ if (!defined('ABSPATH')) {
 class DME_Sheets
 {
     /**
+     * 価格表キャッシュキーの現在バージョン。
+     */
+    const BOOKS_CACHE_KEY = 'dme_sheet_books_v5';
+
+    /**
      * APIキー未設定警告の重複出力抑止。
      *
      * @var bool
@@ -86,13 +91,13 @@ class DME_Sheets
      */
     public static function get_all_books()
     {
-        $cache_key = 'dme_sheet_books_v2';
+        $cache_key = self::BOOKS_CACHE_KEY;
         $cached = get_transient($cache_key);
         if (is_array($cached)) {
-            self::debug_log('Cache hit');
+            self::debug_log('Cache hit', ['cache_key' => $cache_key]);
             return $cached;
         }
-        self::debug_log('Cache miss; loading sheets');
+        self::debug_log('Cache miss; loading sheets', ['cache_key' => $cache_key]);
 
         $output = [];
         foreach (self::SHEET_BOOKS as $book_key => $spreadsheet_id) {
@@ -102,8 +107,62 @@ class DME_Sheets
             ];
         }
 
-        set_transient($cache_key, $output, 30 * MINUTE_IN_SECONDS);
+        if (self::has_any_sheet_data($output)) {
+            set_transient($cache_key, $output, 30 * MINUTE_IN_SECONDS);
+            self::debug_log('Cache saved', [
+                'cache_key' => $cache_key,
+                'ttl_seconds' => 30 * MINUTE_IN_SECONDS,
+            ]);
+        } else {
+            self::debug_log('Cache not saved because all fetched sheet data is empty', [
+                'cache_key' => $cache_key,
+            ]);
+        }
+
         return $output;
+    }
+
+    /**
+     * 価格表キャッシュを削除。
+     * dme_sheet_books_* の transient を対象にする。
+     *
+     * @param string $reason 削除理由。
+     * @return int 削除件数。
+     */
+    public static function clear_books_cache($reason = 'manual')
+    {
+        global $wpdb;
+
+        $deleted = 0;
+        $known_keys = ['dme_sheet_books_v1', 'dme_sheet_books_v2', 'dme_sheet_books_v3', 'dme_sheet_books_v4', 'dme_sheet_books_v5'];
+        foreach ($known_keys as $key) {
+            if (delete_transient($key)) {
+                $deleted++;
+            }
+        }
+
+        if (isset($wpdb) && $wpdb instanceof wpdb) {
+            $option_names = $wpdb->get_col(
+                "SELECT option_name FROM {$wpdb->options}
+                WHERE option_name LIKE '\\_transient\\_dme\\_sheet\\_books\\_%'
+                   OR option_name LIKE '\\_transient\\_timeout\\_dme\\_sheet\\_books\\_%'"
+            );
+            if (is_array($option_names)) {
+                foreach ($option_names as $option_name) {
+                    if (delete_option($option_name)) {
+                        $deleted++;
+                    }
+                }
+            }
+        }
+
+        self::debug_log('Cache delete executed', [
+            'reason' => $reason,
+            'deleted_rows' => $deleted,
+            'cache_prefix' => 'dme_sheet_books_',
+        ]);
+
+        return (int) $deleted;
     }
 
     /**
@@ -368,6 +427,27 @@ class DME_Sheets
         }
 
         return $rows;
+    }
+
+    /**
+     * 取得結果に有効なシートデータがあるか判定。
+     *
+     * @param array $books 全ブックデータ。
+     * @return bool
+     */
+    private static function has_any_sheet_data($books)
+    {
+        if (!is_array($books)) {
+            return false;
+        }
+
+        foreach ($books as $book_data) {
+            if (!empty($book_data['sheets']) && is_array($book_data['sheets'])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

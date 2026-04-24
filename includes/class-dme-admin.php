@@ -20,6 +20,7 @@ class DME_Admin
     {
         add_action('admin_menu', [__CLASS__, 'register_menu']);
         add_action('admin_init', [__CLASS__, 'register_settings']);
+        add_action('admin_post_dme_clear_price_cache', [__CLASS__, 'handle_clear_price_cache']);
     }
 
     /**
@@ -81,9 +82,18 @@ class DME_Admin
      */
     public static function sanitize_settings($input)
     {
+        $existing = get_option(self::OPTION_KEY, []);
+        $old_api_key = isset($existing['google_api_key']) ? trim((string) $existing['google_api_key']) : '';
+        $new_api_key = isset($input['google_api_key']) ? sanitize_text_field($input['google_api_key']) : '';
+        $new_api_key = trim((string) $new_api_key);
+
+        if ($new_api_key !== $old_api_key && class_exists('DME_Sheets')) {
+            DME_Sheets::clear_books_cache('api_key_updated');
+        }
+
         return [
             'recipient_email' => isset($input['recipient_email']) ? sanitize_email($input['recipient_email']) : '',
-            'google_api_key' => isset($input['google_api_key']) ? sanitize_text_field($input['google_api_key']) : '',
+            'google_api_key' => $new_api_key,
         ];
     }
 
@@ -142,8 +152,42 @@ class DME_Admin
                 submit_button();
                 ?>
             </form>
+            <hr />
+            <h2>価格表キャッシュ</h2>
+            <?php if (!empty($_GET['dme_cache_cleared'])) : ?>
+                <div class="notice notice-success"><p>価格表キャッシュを削除しました。</p></div>
+            <?php endif; ?>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                <input type="hidden" name="action" value="dme_clear_price_cache" />
+                <?php wp_nonce_field('dme_clear_price_cache_action', 'dme_clear_price_cache_nonce'); ?>
+                <?php submit_button('価格表キャッシュを削除', 'secondary', 'submit', false); ?>
+            </form>
         </div>
         <?php
+    }
+
+    /**
+     * 価格表キャッシュ削除ボタンのハンドラー。
+     *
+     * @return void
+     */
+    public static function handle_clear_price_cache()
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+        check_admin_referer('dme_clear_price_cache_action', 'dme_clear_price_cache_nonce');
+
+        if (class_exists('DME_Sheets')) {
+            DME_Sheets::clear_books_cache('manual_button');
+        }
+
+        $redirect_url = add_query_arg(
+            ['page' => 'dme-settings', 'dme_cache_cleared' => 1],
+            admin_url('options-general.php')
+        );
+        wp_safe_redirect($redirect_url);
+        exit;
     }
 
     /**
