@@ -10,6 +10,13 @@ if (!defined('ABSPATH')) {
 class DME_Sheets
 {
     /**
+     * APIキー未設定警告の重複出力抑止。
+     *
+     * @var bool
+     */
+    private static $missing_api_key_warned = false;
+
+    /**
      * 参照するスプレッドシートID一覧。
      * キーはシステム内の種別キー。
      */
@@ -24,13 +31,6 @@ class DME_Sheets
         'paper_weight' => '1aGhlED9eQy_QdDk5pMFKs7GR2Lz7yJABzZCGi49Bnjw',
         'postage' => '18eAZhTocuD45Rq2LoL4cRUnJVKRLq6Bl0WRE3AAllTM',
     ];
-
-    /**
-     * ブックごとの固定シート名（必要に応じて filter で上書き）。
-     *
-     * @var array
-     */
-    const SHEET_TITLES = [];
 
     /**
      * フロント向けカタログを返す。
@@ -115,51 +115,6 @@ class DME_Sheets
      */
     private static function load_book_sheets($spreadsheet_id, $book_key = '')
     {
-        $worksheets_url = sprintf(
-            'https://spreadsheets.google.com/feeds/worksheets/%s/public/full?alt=json',
-            rawurlencode($spreadsheet_id)
-        );
-        self::debug_log('Worksheet discovery request', [
-            'book_key' => $book_key,
-            'spreadsheet_id' => $spreadsheet_id,
-            'worksheets_url' => $worksheets_url,
-        ]);
-
-        $worksheets_res = wp_remote_get($worksheets_url, ['timeout' => 15]);
-        if (is_wp_error($worksheets_res)) {
-            self::debug_log('Worksheet discovery failed', [
-                'book_key' => $book_key,
-                'spreadsheet_id' => $spreadsheet_id,
-                'worksheets_url' => $worksheets_url,
-                'error' => $worksheets_res->get_error_message(),
-            ]);
-        } else {
-            $worksheets_status = (int) wp_remote_retrieve_response_code($worksheets_res);
-            $worksheets_body = (string) wp_remote_retrieve_body($worksheets_res);
-            $worksheets_json = json_decode($worksheets_body, true);
-            $has_feed_entry = is_array($worksheets_json)
-                && !empty($worksheets_json['feed']['entry'])
-                && is_array($worksheets_json['feed']['entry']);
-            $feed_sheet_names = [];
-            if ($has_feed_entry) {
-                foreach ($worksheets_json['feed']['entry'] as $entry) {
-                    if (!empty($entry['title']['$t'])) {
-                        $feed_sheet_names[] = (string) $entry['title']['$t'];
-                    }
-                }
-            }
-
-            self::debug_log('Worksheet discovery response', [
-                'book_key' => $book_key,
-                'spreadsheet_id' => $spreadsheet_id,
-                'worksheets_url' => $worksheets_url,
-                'http_status' => $worksheets_status,
-                'body_head_500' => mb_substr($worksheets_body, 0, 500),
-                'has_feed_entry' => $has_feed_entry,
-                'sheet_names_from_feed' => $feed_sheet_names,
-            ]);
-        }
-
         $sheet_names = self::get_sheet_names($spreadsheet_id);
         self::debug_log('Resolved sheet names', [
             'book_key' => $book_key,
@@ -267,27 +222,16 @@ class DME_Sheets
 
     /**
      * スプレッドシートからシート名一覧を取得する。
-     * 優先順位:
-     * 1) 固定シート名（定数/フィルター）
-     * 2) Google Sheets API v4（APIキー指定時）
+     * Google Sheets API v4 で自動取得する。
      *
      * @param string $spreadsheet_id スプレッドシートID。
      * @return array
      */
     private static function get_sheet_names($spreadsheet_id)
     {
-        $static_map = apply_filters('dme_sheet_titles_map', self::SHEET_TITLES);
-        if (isset($static_map[$spreadsheet_id]) && is_array($static_map[$spreadsheet_id]) && !empty($static_map[$spreadsheet_id])) {
-            self::debug_log('Using static sheet names', [
-                'spreadsheet_id' => $spreadsheet_id,
-                'sheet_names' => $static_map[$spreadsheet_id],
-            ]);
-            return array_values($static_map[$spreadsheet_id]);
-        }
-
         $api_key = self::get_google_api_key();
         if ($api_key === '') {
-            self::debug_log('Google API key is empty; cannot discover sheet names via v4', [
+            self::warn_missing_api_key([
                 'spreadsheet_id' => $spreadsheet_id,
             ]);
             return [];
@@ -355,8 +299,27 @@ class DME_Sheets
             return (string) DME_GOOGLE_API_KEY;
         }
 
-        $option = get_option('dme_google_api_key');
-        return is_string($option) ? trim($option) : '';
+        if (class_exists('DME_Admin')) {
+            return DME_Admin::get_google_api_key();
+        }
+
+        return '';
+    }
+
+    /**
+     * APIキー未設定警告を1回だけ出力。
+     *
+     * @param array $context 補足情報。
+     * @return void
+     */
+    private static function warn_missing_api_key($context = [])
+    {
+        if (self::$missing_api_key_warned) {
+            return;
+        }
+        self::$missing_api_key_warned = true;
+
+        self::debug_log('Google Sheets API Key is missing. Set it in Settings > DM Estimator to enable sheet discovery.', $context);
     }
 
     /**
