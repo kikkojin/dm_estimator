@@ -12,7 +12,11 @@ if (!defined('ABSPATH')) {
 }
 
 // 定数定義（将来の拡張でパス参照を統一するため）。
-define('DME_VERSION', '1.0.0');
+if (!function_exists('get_file_data')) {
+    require_once ABSPATH . 'wp-admin/includes/plugin.php';
+}
+$dme_plugin_data = get_file_data(__FILE__, ['Version' => 'Version'], 'plugin');
+define('DME_VERSION', $dme_plugin_data['Version'] ?: '1.0.0');
 define('DME_PLUGIN_FILE', __FILE__);
 define('DME_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('DME_PLUGIN_URL', plugin_dir_url(__FILE__));
