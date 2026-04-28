@@ -87,21 +87,21 @@ class DME_Plugin
             <div class="dme-card">
                 <h3>基本条件</h3>
                 <div class="dme-grid dme-grid-3">
-                    <label>作業内容
+                    <label>作業内容を選択してください。
                         <select data-field="workType">
                             <option value="">選択してください</option>
                             <option value="dm">DM発送</option>
                             <option value="survey">アンケート発送</option>
                         </select>
                     </label>
-                    <label>発送方法
+                    <label>発送方法を選択してください。（メール便のご利用は、信書に該当しないものに限られます。）
                         <select data-field="shipMethod">
                             <option value="">選択してください</option>
                             <option value="mail">メール便</option>
                             <option value="post">郵送</option>
                         </select>
                     </label>
-                    <label>発送部数
+                    <label>発送する部数は何部ですか。
                         <input data-field="shipCount" type="number" min="1" step="1" value="100">
                     </label>
                 </div>
@@ -110,20 +110,20 @@ class DME_Plugin
             <div class="dme-card">
                 <h3>封筒</h3>
                 <div class="dme-grid dme-grid-3">
-                    <label>封筒使用
+                    <label>往信用の封筒は使用しますか。
                         <select data-field="envelope.use">
                             <option value="no">なし</option>
                             <option value="yes">あり</option>
                         </select>
                     </label>
-                    <label>印刷/種別
+                    <label>封筒の種類を選択してください。
                         <select data-field="envelope.mode">
                             <option value="supplied">支給</option>
                             <option value="clear">透明封筒</option>
                             <option value="print">封筒印刷</option>
                         </select>
                     </label>
-                    <label>部数
+                    <label>封筒の部数を入力してください。
                         <input data-field="envelope.count" type="number" min="1" step="1" value="100">
                     </label>
                 </div>
@@ -138,9 +138,18 @@ class DME_Plugin
             <div class="dme-card">
                 <h3>返信方法</h3>
                 <div class="dme-grid dme-grid-3">
-                    <label><input type="radio" name="replyMode" value="stamp" checked> 切手</label>
-                    <label><input type="radio" name="replyMode" value="receiver"> 受取人払い</label>
-                    <label><input type="checkbox" data-field="reply.delegate" value="1"> 申請代行</label>
+                    <label>返信の方法を選択してください。
+                        <select data-field="replyMode">
+                            <option value="stamp">切手</option>
+                            <option value="receiver">受取人払い</option>
+                        </select>
+                    </label>
+                    <label>受取人払い申請の代行を希望しますか。
+                        <select data-field="reply.delegate">
+                            <option value="0">自社で行う</option>
+                            <option value="1">依頼する</option>
+                        </select>
+                    </label>
                 </div>
             </div>
 

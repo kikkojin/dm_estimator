@@ -122,7 +122,7 @@
     });
   }
 
-  root.addEventListener('input', (e) => {
+  function handleRootFieldEvent(e) {
     const field = e.target.getAttribute('data-field');
     const contact = e.target.getAttribute('data-contact');
     if (field) {
@@ -135,14 +135,10 @@
     if (contact) {
       state.contact[contact] = e.target.value;
     }
-  });
+  }
 
-  root.addEventListener('change', (e) => {
-    if (e.target.name === 'replyMode') {
-      state.replyMode = e.target.value;
-      fetchEstimate();
-    }
-  });
+  root.addEventListener('input', handleRootFieldEvent);
+  root.addEventListener('change', handleRootFieldEvent);
 
   $contents.addEventListener('input', (e) => {
     const row = e.target.closest('.dme-content-row');
