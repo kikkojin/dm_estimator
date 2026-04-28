@@ -724,6 +724,8 @@ class DME_Sheets
         $matrix = [];
         $quantities = [];
 
+        $fallback_qty = 1;
+
         for ($r = 1; $r < count($rows); $r++) {
             $row = $rows[$r];
             if (!isset($row[0])) {
@@ -732,19 +734,30 @@ class DME_Sheets
 
             $qty = (int) preg_replace('/[^0-9]/', '', (string) $row[0]);
             if ($qty <= 0) {
-                continue;
+                // 作業費などは1列目が名称で、部数になっていない表がある。
+                $qty = $fallback_qty;
+                $fallback_qty++;
             }
 
-            $quantities[] = $qty;
-            $matrix[$qty] = [];
-
+            $row_prices = [];
             foreach ($headers as $index => $header_key) {
                 $cell_index = $index + 1;
                 $price = isset($row[$cell_index]) ? self::to_int_price($row[$cell_index]) : null;
                 if ($price !== null) {
-                    $matrix[$qty][$header_key] = $price;
+                    $row_prices[$header_key] = $price;
                 }
             }
+
+            if (empty($row_prices)) {
+                continue;
+            }
+
+            while (isset($matrix[$qty])) {
+                $qty++;
+            }
+
+            $quantities[] = $qty;
+            $matrix[$qty] = $row_prices;
         }
 
         if (empty($quantities)) {
