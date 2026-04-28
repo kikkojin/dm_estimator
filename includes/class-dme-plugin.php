@@ -95,7 +95,7 @@ class DME_Plugin
                             <option value="survey">アンケート発送</option>
                         </select>
                     </label>
-                    <label>発送方法を選択してください。（メール便のご利用は、信書に該当しないものに限られます。）
+                    <label class="dme-label-full">発送方法を選択してください。（メール便のご利用は、信書に該当しないものに限られます。）
                         <select data-field="shipMethod">
                             <option value="">選択してください</option>
                             <option value="mail">メール便</option>
@@ -111,7 +111,7 @@ class DME_Plugin
             <div class="dme-card">
                 <h3>封筒</h3>
                 <div class="dme-grid dme-grid-3">
-                    <label>往信用の封筒は使用しますか。
+                    <label class="dme-label-full">往信用の封筒は使用しますか。
                         <select data-field="envelope.use">
                             <option value="no">なし</option>
                             <option value="yes">あり</option>
