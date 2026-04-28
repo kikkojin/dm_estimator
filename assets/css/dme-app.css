@@ -3,6 +3,7 @@
 .dme-grid { display: grid; gap: 8px; }
 .dme-grid-3 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .dme-grid-4 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.dme-label-full { grid-column: 1 / -1; }
 .dme-root label { display: block; font-weight: 600; }
 .dme-root input, .dme-root select, .dme-root textarea { display: block; width: 100%; margin-top: 4px; }
 .dme-table { width: 100%; border-collapse: collapse; }
