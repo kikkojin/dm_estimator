@@ -14,6 +14,8 @@
 
   const root = document.getElementById('dme-root');
   if (!root || typeof DME_APP === 'undefined') return;
+  // テスト環境でキャッシュ反映状況を確認しやすくするため、読み込みバージョンを1回だけ出力する。
+  console.log(`DM Estimator version: ${DME_APP.version || 'unknown'}`);
 
   const printCatalog = DME_APP.catalog.printCatalog || [];
   const $contents = root.querySelector('#dme-contents');

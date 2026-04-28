@@ -71,6 +71,7 @@ class DME_Plugin
         wp_localize_script('dme-app', 'DME_APP', [
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('dme_nonce'),
+            'version' => DME_VERSION,
             'catalog' => $catalog_payload,
             'labels' => [
                 'cannotEstimate' => '見積不可',
