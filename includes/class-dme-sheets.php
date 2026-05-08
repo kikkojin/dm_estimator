@@ -10,7 +10,10 @@ if (!defined('ABSPATH')) {
 class DME_Sheets
 {
     const CACHE_KEY = 'dme_sheet_books_v2';
+    const CACHE_TTL = DAY_IN_SECONDS;
     const CACHE_KEY_PREFIX = 'dme_sheet_books_';
+    const CRON_HOOK = 'dme_refresh_price_cache_event';
+    const CRON_STATUS_OPTION = 'dme_price_cache_refresh_status';
 
     /**
      * APIキー未設定警告の重複出力抑止。
@@ -108,18 +111,39 @@ class DME_Sheets
         $disable_cache = self::is_price_cache_disabled();
         $cache_key = self::CACHE_KEY;
 
+        // 開発用の「キャッシュ無効化」がONなら、従来通り毎回取得する。
+        // 本番運用の通常パスではこの分岐に入らない想定。
         if ($disable_cache) {
             self::debug_log('価格表キャッシュ無効化中のため、スプレッドシートから再取得します');
             self::clear_books_cache('価格表キャッシュ無効化中');
-        } else {
-            $cached = get_transient($cache_key);
-            if (is_array($cached)) {
-                self::debug_log('価格表キャッシュを使用しました');
-                return $cached;
-            }
-            self::debug_log('価格表キャッシュが見つからないため、スプレッドシートから再取得します');
+            return self::fetch_all_books_from_remote();
         }
 
+        // 訪問者アクセス時は、まずキャッシュを返すことを最優先にする。
+        $cached = get_transient($cache_key);
+        if (is_array($cached)) {
+            self::debug_log('価格表キャッシュを使用しました');
+            return $cached;
+        }
+
+        // 初回起動直後などキャッシュ未生成時だけ、同期取得でフォールバックする。
+        self::debug_log('価格表キャッシュが未生成のため、初回データを同期取得します');
+        $fetched = self::fetch_all_books_from_remote();
+        if (!self::has_any_price_data($fetched)) {
+            self::debug_log('初回同期取得に失敗したため空データを返します（次回Cron更新待ち）', [], 'warning');
+            return $fetched;
+        }
+        set_transient($cache_key, $fetched, self::CACHE_TTL);
+        return $fetched;
+    }
+
+    /**
+     * Googleスプレッドシートから全ブックを再取得する。
+     *
+     * @return array
+     */
+    private static function fetch_all_books_from_remote()
+    {
         $output = [];
         foreach (self::SHEET_BOOKS as $book_key => $spreadsheet_id) {
             $output[$book_key] = [
@@ -128,17 +152,67 @@ class DME_Sheets
             ];
         }
 
-        if ($disable_cache) {
-            return $output;
-        }
-
-        if (!self::has_any_price_data($output)) {
-            self::debug_log('価格表データが空のため、キャッシュ保存しませんでした', [], 'warning');
-            return $output;
-        }
-
-        set_transient($cache_key, $output, 30 * MINUTE_IN_SECONDS);
         return $output;
+    }
+
+    /**
+     * Cron または手動更新から呼び出す価格表キャッシュ更新処理。
+     *
+     * 重要:
+     * - 取得成功時のみキャッシュ上書き
+     * - 取得失敗時は既存キャッシュを維持（削除しない）
+     *
+     * @param string $trigger 実行トリガー（cron/manual など）。
+     * @return array
+     */
+    public static function refresh_books_cache($trigger = 'cron')
+    {
+        self::debug_log('Cron価格表更新を開始します', ['trigger' => $trigger]);
+
+        if (self::is_price_cache_disabled()) {
+            self::debug_log('キャッシュ無効化設定のためCron更新をスキップします', ['trigger' => $trigger], 'warning');
+            self::update_refresh_status('skipped', 0, 'disable_price_cache が ON のため更新スキップ', $trigger);
+            return ['ok' => false, 'count' => 0, 'status' => 'skipped'];
+        }
+
+        $fetched = self::fetch_all_books_from_remote();
+        $count = self::count_total_sheet_entries($fetched);
+
+        if (!self::has_any_price_data($fetched)) {
+            self::debug_log('Cron価格表更新に失敗。既存キャッシュを維持します', ['trigger' => $trigger], 'error');
+            self::update_refresh_status('failed', 0, '取得失敗（既存キャッシュ維持）', $trigger);
+            return ['ok' => false, 'count' => 0, 'status' => 'failed'];
+        }
+
+        set_transient(self::CACHE_KEY, $fetched, self::CACHE_TTL);
+        self::debug_log('Cron価格表更新に成功しました', ['trigger' => $trigger, 'sheet_entries' => $count]);
+        self::update_refresh_status('success', $count, '更新成功', $trigger);
+        return ['ok' => true, 'count' => $count, 'status' => 'success'];
+    }
+
+    public static function get_refresh_status()
+    {
+        return get_option(self::CRON_STATUS_OPTION, []);
+    }
+
+    private static function update_refresh_status($result, $count, $message, $trigger)
+    {
+        update_option(self::CRON_STATUS_OPTION, [
+            'updated_at' => current_time('mysql'),
+            'result' => (string) $result,
+            'count' => (int) $count,
+            'message' => (string) $message,
+            'trigger' => (string) $trigger,
+        ], false);
+    }
+
+    private static function count_total_sheet_entries($books)
+    {
+        $count = 0;
+        foreach ((array) $books as $book) {
+            $count += !empty($book['sheets']) && is_array($book['sheets']) ? count($book['sheets']) : 0;
+        }
+        return $count;
     }
 
     /**
