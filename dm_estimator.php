@@ -28,3 +28,5 @@ require_once DME_PLUGIN_DIR . 'includes/class-dme-ajax.php';
 require_once DME_PLUGIN_DIR . 'includes/class-dme-plugin.php';
 
 DME_Plugin::init();
+register_activation_hook(DME_PLUGIN_FILE, ['DME_Plugin', 'activate']);
+register_deactivation_hook(DME_PLUGIN_FILE, ['DME_Plugin', 'deactivate']);

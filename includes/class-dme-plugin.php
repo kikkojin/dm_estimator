@@ -18,9 +18,46 @@ class DME_Plugin
     {
         add_action('init', [__CLASS__, 'register_shortcode']);
         add_action('wp_enqueue_scripts', [__CLASS__, 'register_assets']);
+        add_action(DME_Sheets::CRON_HOOK, [__CLASS__, 'run_price_cache_cron']);
 
         DME_Admin::init();
         DME_Ajax::init();
+    }
+
+    /**
+     * 有効化時: Cron登録（重複防止）。
+     *
+     * @return void
+     */
+    public static function activate()
+    {
+        if (!wp_next_scheduled(DME_Sheets::CRON_HOOK)) {
+            wp_schedule_event(time() + 60, 'hourly', DME_Sheets::CRON_HOOK);
+        }
+    }
+
+    /**
+     * 停止時: Cron登録解除。
+     *
+     * @return void
+     */
+    public static function deactivate()
+    {
+        $timestamp = wp_next_scheduled(DME_Sheets::CRON_HOOK);
+        if ($timestamp) {
+            wp_unschedule_event($timestamp, DME_Sheets::CRON_HOOK);
+        }
+        wp_clear_scheduled_hook(DME_Sheets::CRON_HOOK);
+    }
+
+    /**
+     * Cron本体。
+     *
+     * @return void
+     */
+    public static function run_price_cache_cron()
+    {
+        DME_Sheets::refresh_books_cache('cron');
     }
 
     /**

@@ -21,6 +21,7 @@ class DME_Admin
         add_action('admin_menu', [__CLASS__, 'register_menu']);
         add_action('admin_init', [__CLASS__, 'register_settings']);
         add_action('admin_post_dme_delete_price_cache', [__CLASS__, 'handle_delete_price_cache']);
+        add_action('admin_post_dme_refresh_price_cache', [__CLASS__, 'handle_refresh_price_cache']);
     }
 
     /**
@@ -200,6 +201,12 @@ class DME_Admin
             <?php if (isset($_GET['dme_cache_deleted']) && $_GET['dme_cache_deleted'] === '1') : ?>
                 <div class="notice notice-success is-dismissible"><p>価格表キャッシュを削除しました。</p></div>
             <?php endif; ?>
+            <?php if (isset($_GET['dme_cache_refreshed']) && $_GET['dme_cache_refreshed'] === '1') : ?>
+                <div class="notice notice-success is-dismissible"><p>価格表キャッシュを更新しました。</p></div>
+            <?php endif; ?>
+            <?php if (isset($_GET['dme_cache_refreshed']) && $_GET['dme_cache_refreshed'] === '0') : ?>
+                <div class="notice notice-warning is-dismissible"><p>価格表キャッシュ更新に失敗しました。既存キャッシュは維持されています。</p></div>
+            <?php endif; ?>
             <?php if ($api_key === '') : ?>
                 <div class="notice notice-warning"><p><strong>Google Sheets API Key が未設定です。</strong> 価格表のシート名を自動取得できないため、見積データが読み込まれません。</p></div>
                 <?php self::debug_log_missing_api_key_notice(); ?>
@@ -219,7 +226,31 @@ class DME_Admin
                 <input type="hidden" name="action" value="dme_delete_price_cache" />
                 <?php submit_button('価格表キャッシュを削除', 'secondary', 'submit', false); ?>
             </form>
+            <p>価格表を今すぐ再取得してキャッシュを更新できます。</p>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                <?php wp_nonce_field('dme_refresh_price_cache_action', 'dme_refresh_price_cache_nonce'); ?>
+                <input type="hidden" name="action" value="dme_refresh_price_cache" />
+                <?php submit_button('価格表を今すぐ再取得してキャッシュ更新', 'secondary', 'submit', false); ?>
+            </form>
+            <?php self::render_refresh_status_panel(); ?>
         </div>
+        <?php
+    }
+
+    private static function render_refresh_status_panel()
+    {
+        $status = DME_Sheets::get_refresh_status();
+        ?>
+        <h3>価格表キャッシュ更新ステータス</h3>
+        <table class="widefat striped" style="max-width:800px;">
+            <tbody>
+                <tr><th style="width:220px;">最終更新日時</th><td><?php echo !empty($status['updated_at']) ? esc_html($status['updated_at']) : '未実行'; ?></td></tr>
+                <tr><th>最終更新結果</th><td><?php echo !empty($status['result']) ? esc_html($status['result']) : '未実行'; ?></td></tr>
+                <tr><th>取得件数（正規化シート数）</th><td><?php echo isset($status['count']) ? esc_html((string) $status['count']) : '-'; ?></td></tr>
+                <tr><th>実行トリガー</th><td><?php echo !empty($status['trigger']) ? esc_html($status['trigger']) : '-'; ?></td></tr>
+                <tr><th>メッセージ</th><td><?php echo !empty($status['message']) ? esc_html($status['message']) : '-'; ?></td></tr>
+            </tbody>
+        </table>
         <?php
     }
 
@@ -292,6 +323,25 @@ class DME_Admin
             [
                 'page' => 'dme-settings',
                 'dme_cache_deleted' => '1',
+            ],
+            admin_url('options-general.php')
+        );
+        wp_safe_redirect($redirect_url);
+        exit;
+    }
+
+    public static function handle_refresh_price_cache()
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Forbidden');
+        }
+        check_admin_referer('dme_refresh_price_cache_action', 'dme_refresh_price_cache_nonce');
+
+        $result = DME_Sheets::refresh_books_cache('manual');
+        $redirect_url = add_query_arg(
+            [
+                'page' => 'dme-settings',
+                'dme_cache_refreshed' => !empty($result['ok']) ? '1' : '0',
             ],
             admin_url('options-general.php')
         );
