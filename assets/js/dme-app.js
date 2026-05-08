@@ -26,6 +26,14 @@
 
   const yen = (n) => `${DME_APP.labels.currencyPrefix}${Number(n || 0).toLocaleString()}`;
 
+  /**
+   * 作業内容の選択有無を判定する。
+   * 初期表示時は workType が空文字のため、見積計算は実行しない。
+   */
+  function hasSelectedWorkType() {
+    return !!state.workType;
+  }
+
   function setByPath(obj, path, value) {
     const keys = path.split('.');
     let cur = obj;
@@ -34,6 +42,14 @@
   }
 
   function fetchEstimate() {
+    // 初期表示では「作業内容」が未選択のため、ここで即 return する。
+    // ページを開いただけで明細（発送基本料金/内容物/封入作業など）が並ぶのを防ぎ、
+    // ユーザーが作業内容を選択してから初めて見積計算を走らせるためのガード。
+    if (!hasSelectedWorkType()) {
+      renderEmptyEstimate();
+      return Promise.resolve();
+    }
+
     return fetch(`${DME_APP.ajaxUrl}?action=dme_calculate&nonce=${encodeURIComponent(DME_APP.nonce)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -46,6 +62,22 @@
           renderEstimate();
         }
       });
+  }
+
+  /**
+   * 見積明細を初期状態（未計算状態）で表示する。
+   * - 明細テーブルは空
+   * - 合計は 0 円
+   * - ステータスは入力ガイド
+   *
+   * 「計算して 0 円」ではなく「まだ計算していない」状態を明確にするため、
+   * fetchEstimate を呼ばないケースでもこの関数で UI を統一する。
+   */
+  function renderEmptyEstimate() {
+    $tbody.innerHTML = '';
+    $total.textContent = yen(0);
+    $status.textContent = '作業内容を選択してください';
+    $status.className = 'ng';
   }
 
   function renderEstimate() {
@@ -174,6 +206,8 @@
 
   root.querySelector('#dme-add-content').addEventListener('click', () => {
     addContentRow();
+    // 内容物行の追加だけでは見積計算を開始しない。
+    // 作業内容が選択済みの場合のみ fetchEstimate 内で計算される。
     fetchEstimate();
   });
 
@@ -198,5 +232,7 @@
 
   refreshEnvelopeOptions();
   addContentRow();
-  fetchEstimate();
+  // 初期表示時は「内容物1」の入力行のみ表示し、見積計算は実行しない。
+  // これによりページ表示直後の明細自動表示を避け、入力導線を明確にする。
+  renderEmptyEstimate();
 })();
