@@ -3,7 +3,7 @@
     workType: '',
     shipMethod: '',
     shipCount: 100,
-    envelope: { use: 'no', mode: 'supplied', size: '', paper: '', thickness: '', tape: '', count: 100, spec: '' },
+    envelope: { use: '', mode: '', size: '', paper: '', thickness: '', tape: '', count: 100, spec: '' },
     replyMode: 'stamp',
     reply: { delegate: false },
     envelopeDesignRequest: false,
@@ -114,11 +114,40 @@
     return ['<option value="">選択してください</option>'].concat(values.map((v) => `<option value="${v}" ${selected === v ? 'selected' : ''}>${v}</option>`)).join('');
   }
 
+
+  function setEnvelopeVisibility() {
+    const use = state.envelope.use;
+    const mode = state.envelope.mode;
+    const modeBlock = root.querySelector('[data-envelope-block="mode"]');
+    const countBlock = root.querySelector('[data-envelope-block="count"]');
+    const detailBlock = root.querySelector('[data-envelope-block="detail"]');
+    const sizeField = root.querySelector('[data-envelope-field="size"]');
+    const paperField = root.querySelector('[data-envelope-field="paper"]');
+    const thicknessField = root.querySelector('[data-envelope-field="thickness"]');
+    const tapeField = root.querySelector('[data-envelope-field="tape"]');
+
+    const showMode = use === 'yes';
+    const showDetailed = showMode && (mode === 'supplied' || mode === 'print');
+    const showClear = showMode && mode === 'clear';
+
+    if (modeBlock) modeBlock.classList.toggle('dme-hidden', !showMode);
+    if (countBlock) countBlock.classList.toggle('dme-hidden', !(showDetailed || showClear));
+    if (detailBlock) detailBlock.classList.toggle('dme-hidden', !(showDetailed || showClear));
+
+    if (sizeField) sizeField.classList.toggle('dme-hidden', !(showDetailed || showClear));
+    if (paperField) paperField.classList.toggle('dme-hidden', !showDetailed);
+    if (thicknessField) thicknessField.classList.toggle('dme-hidden', !showDetailed);
+    if (tapeField) tapeField.classList.toggle('dme-hidden', !showDetailed);
+  }
+
   function refreshEnvelopeOptions() {
     const opts = getOptionsFor('envelope_print');
     ['size', 'paper', 'thickness'].forEach((k) => {
       const el = root.querySelector(`[data-field="envelope.${k}"]`);
-      if (el) el.innerHTML = optionHtml(opts[k], state.envelope[k]);
+      if (el) {
+        const sourceKey = k === 'size' ? 'paper' : (k === 'paper' ? 'thickness' : (k === 'thickness' ? 'other' : k));
+        el.innerHTML = optionHtml(opts[sourceKey] || opts[k] || [], state.envelope[k]);
+      }
     });
     state.envelope.spec = opts.spec[0] || '';
   }
@@ -164,6 +193,7 @@
       if (e.target.type === 'number') val = Number(val || 0);
       if (e.target.type === 'checkbox') val = !!e.target.checked;
       setByPath(state, field, val);
+      if (field.startsWith('envelope.')) setEnvelopeVisibility();
       fetchEstimate();
     }
     if (contact) {
@@ -231,6 +261,7 @@
   });
 
   refreshEnvelopeOptions();
+  setEnvelopeVisibility();
   addContentRow();
   // 初期表示時は「内容物1」の入力行のみ表示し、見積計算は実行しない。
   // これによりページ表示直後の明細自動表示を避け、入力導線を明確にする。
