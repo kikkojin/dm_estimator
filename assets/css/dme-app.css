@@ -16,3 +16,5 @@
 #dme-status.ok { color: #087b2a; font-weight: 700; }
 #dme-status.ng { color: #b40000; font-weight: 700; }
 .dme-content-row { border-top: 1px dashed #ccc; padding-top: 10px; margin-top: 10px; }
+
+.dme-hidden { display: none !important; }

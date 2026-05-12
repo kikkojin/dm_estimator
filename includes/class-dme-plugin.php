@@ -150,27 +150,27 @@ class DME_Plugin
                     <fieldset class="dme-label-full">
                         <legend>往信用封筒の使用有無を選択してください。</legend>
                         <div class="dme-radio-group">
-                            <label><input data-field="envelope.use" type="radio" name="dme_envelope_use" value="no" checked>なし</label>
+                            <label><input data-field="envelope.use" type="radio" name="dme_envelope_use" value="no">なし</label>
                             <label><input data-field="envelope.use" type="radio" name="dme_envelope_use" value="yes">あり</label>
                         </div>
                     </fieldset>
-                    <fieldset>
+                    <fieldset data-envelope-block="mode">
                         <legend>往信用封筒の種類を選択してください。</legend>
                         <div class="dme-radio-group">
-                            <label><input data-field="envelope.mode" type="radio" name="dme_envelope_mode" value="supplied" checked>支給</label>
+                            <label><input data-field="envelope.mode" type="radio" name="dme_envelope_mode" value="supplied">支給</label>
                             <label><input data-field="envelope.mode" type="radio" name="dme_envelope_mode" value="clear">透明封筒</label>
                             <label><input data-field="envelope.mode" type="radio" name="dme_envelope_mode" value="print">封筒印刷</label>
                         </div>
                     </fieldset>
-                    <label class="dme-label-full">封筒の部数を入力してください。
+                    <label class="dme-label-full" data-envelope-block="count">封筒の部数を入力してください。
                         <input data-field="envelope.count" type="number" min="1" step="1" value="100">
                     </label>
                 </div>
-                <div class="dme-grid dme-grid-4">
-                    <label>サイズ<select data-field="envelope.size"></select></label>
-                    <label>紙質<select data-field="envelope.paper"></select></label>
-                    <label>厚み<select data-field="envelope.thickness"></select></label>
-                    <fieldset>
+                <div class="dme-grid dme-grid-4" data-envelope-block="detail">
+                    <label data-envelope-field="size">サイズ<select data-field="envelope.size"></select></label>
+                    <label data-envelope-field="paper">紙質<select data-field="envelope.paper"></select></label>
+                    <label data-envelope-field="thickness">厚み<select data-field="envelope.thickness"></select></label>
+                    <fieldset data-envelope-field="tape">
                         <legend>テープ有無</legend>
                         <div class="dme-radio-group">
                             <label><input data-field="envelope.tape" type="radio" name="dme_envelope_tape" value="" checked>なし</label>
