@@ -1062,7 +1062,10 @@ class DME_Sheets
     }
 
     /**
-     * シート名を "種類_サイズ_紙質_厚み_その他" で解釈。
+     * シート名を "サイズ_紙質_厚み_テープ有無_納期" 形式として解釈。
+     *
+     * 形式不正（5要素以外）のシートは、選択肢生成・条件一致の対象外にするため
+     * 空条件を返しつつ警告ログを残す。
      *
      * @param string $sheet_name シート名。
      * @return array
@@ -1071,13 +1074,36 @@ class DME_Sheets
     {
         $parts = array_map('trim', explode('_', (string) $sheet_name));
 
+        // シート名の規約: サイズ_紙質_厚み_テープ有無_納期
+        if (count($parts) !== 5) {
+            self::debug_log('シート名フォーマット不正のためスキップします', [
+                'sheet_name' => (string) $sheet_name,
+                'parts_count' => count($parts),
+            ], 'warning');
+
+            return [
+                'size' => '',
+                'paper' => '',
+                'thickness' => '',
+                'tape' => '',
+                'delivery' => '',
+                // 既存参照互換のため残す。
+                'other' => '',
+                'raw' => $parts,
+                'is_valid' => false,
+            ];
+        }
+
         return [
-            'type' => isset($parts[0]) ? $parts[0] : '',
-            'size' => isset($parts[1]) ? $parts[1] : '',
-            'paper' => isset($parts[2]) ? $parts[2] : '',
-            'thickness' => isset($parts[3]) ? $parts[3] : '',
-            'other' => isset($parts[4]) ? $parts[4] : '',
+            'size' => $parts[0],
+            'paper' => $parts[1],
+            'thickness' => $parts[2],
+            'tape' => $parts[3],
+            'delivery' => $parts[4],
+            // 既存参照互換のため残す。
+            'other' => $parts[4],
             'raw' => $parts,
+            'is_valid' => true,
         ];
     }
 

@@ -151,6 +151,7 @@ class DME_Pricing
             'paper' => isset($envelope['paper']) ? $envelope['paper'] : '',
             'thickness' => isset($envelope['thickness']) ? $envelope['thickness'] : '',
             'spec' => isset($envelope['spec']) ? $envelope['spec'] : '',
+            'tape' => isset($envelope['tape']) ? $envelope['tape'] : '',
             'quantity' => $count,
         ];
 
@@ -210,6 +211,10 @@ class DME_Pricing
                 continue;
             }
             if (!empty($query['thickness']) && (!isset($conditions['thickness']) || $conditions['thickness'] !== $query['thickness'])) {
+                continue;
+            }
+
+            if (!empty($query['tape']) && (!isset($conditions['tape']) || $conditions['tape'] !== $query['tape'])) {
                 continue;
             }
 

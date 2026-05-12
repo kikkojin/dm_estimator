@@ -106,6 +106,7 @@
       size: uniq('size'),
       paper: uniq('paper'),
       thickness: uniq('thickness'),
+      tape: uniq('tape'),
       spec: [...new Set(filtered.flatMap((s) => s.headers || []).filter(Boolean))],
     };
   }
@@ -142,11 +143,11 @@
 
   function refreshEnvelopeOptions() {
     const opts = getOptionsFor('envelope_print');
-    ['size', 'paper', 'thickness'].forEach((k) => {
+    // 往信用封筒の候補はシート名の分解結果から直接生成する。
+    ['size', 'paper', 'thickness', 'tape'].forEach((k) => {
       const el = root.querySelector(`[data-field="envelope.${k}"]`);
       if (el) {
-        const sourceKey = k === 'size' ? 'paper' : (k === 'paper' ? 'thickness' : (k === 'thickness' ? 'other' : k));
-        el.innerHTML = optionHtml(opts[sourceKey] || opts[k] || [], state.envelope[k]);
+        el.innerHTML = optionHtml(opts[k] || [], state.envelope[k]);
       }
     });
     state.envelope.spec = opts.spec[0] || '';
