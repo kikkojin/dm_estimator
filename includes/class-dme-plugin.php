@@ -162,7 +162,7 @@ class DME_Plugin
                             <label><input data-field="envelope.mode" type="radio" name="dme_envelope_mode" value="print">封筒印刷</label>
                         </div>
                     </fieldset>
-                    <label>封筒の部数を入力してください。
+                    <label class="dme-label-full">封筒の部数を入力してください。
                         <input data-field="envelope.count" type="number" min="1" step="1" value="100">
                     </label>
                 </div>
