@@ -6,6 +6,11 @@
 .dme-label-full { grid-column: 1 / -1; }
 .dme-root label { display: block; font-weight: 600; }
 .dme-root input, .dme-root select, .dme-root textarea { display: block; width: 100%; margin-top: 4px; }
+.dme-root fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+.dme-root legend { font-weight: 600; margin-bottom: 4px; }
+.dme-radio-group { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+.dme-radio-group label { display: inline-flex; align-items: center; gap: 4px; font-weight: 500; }
+.dme-radio-group input[type="radio"] { width: auto; margin-top: 0; }
 .dme-table { width: 100%; border-collapse: collapse; }
 .dme-table th, .dme-table td { border: 1px solid #ccc; padding: 6px; }
 #dme-status.ok { color: #087b2a; font-weight: 700; }
