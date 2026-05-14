@@ -1072,13 +1072,13 @@ class DME_Sheets
      */
     private static function parse_conditions_from_sheet_name($sheet_name)
     {
-        $parts = array_map('trim', explode('_', (string) $sheet_name));
+        $sheet_parts = array_map('trim', explode('_', (string) $sheet_name));
 
         // シート名の規約: サイズ_紙質_厚み_テープ有無_納期
-        if (count($parts) !== 5) {
+        if (count($sheet_parts) !== 5) {
             self::debug_log('シート名フォーマット不正のためスキップします', [
                 'sheet_name' => (string) $sheet_name,
-                'parts_count' => count($parts),
+                'parts_count' => count($sheet_parts),
             ], 'warning');
 
             return [
@@ -1089,20 +1089,30 @@ class DME_Sheets
                 'delivery' => '',
                 // 既存参照互換のため残す。
                 'other' => '',
-                'raw' => $parts,
+                'raw' => $sheet_parts,
                 'is_valid' => false,
             ];
         }
 
+
+        self::debug_log('[封筒シート解析]', [
+            'sheetName' => (string) $sheet_name,
+            'size' => $sheet_parts[0],
+            'paper' => $sheet_parts[1],
+            'thickness' => $sheet_parts[2],
+            'tape' => $sheet_parts[3],
+            'delivery' => $sheet_parts[4],
+        ]);
+
         return [
-            'size' => $parts[0],
-            'paper' => $parts[1],
-            'thickness' => $parts[2],
-            'tape' => $parts[3],
-            'delivery' => $parts[4],
+            'size' => $sheet_parts[0],
+            'paper' => $sheet_parts[1],
+            'thickness' => $sheet_parts[2],
+            'tape' => $sheet_parts[3],
+            'delivery' => $sheet_parts[4],
             // 既存参照互換のため残す。
-            'other' => $parts[4],
-            'raw' => $parts,
+            'other' => $sheet_parts[4],
+            'raw' => $sheet_parts,
             'is_valid' => true,
         ];
     }
