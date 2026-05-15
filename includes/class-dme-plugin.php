@@ -132,7 +132,7 @@ class DME_Plugin
                         </div>
                     </fieldset>
                     <label>発送する部数は何部ですか。
-                        <input data-field="shipCount" type="number" min="1" step="1" value="100">
+                        <input data-field="shipCount" type="number" min="1" step="1" value="1000">
                     </label>
                 </div>
             </div>
@@ -141,10 +141,10 @@ class DME_Plugin
                 <h3>往信用封筒</h3>
                 <div class="dme-grid dme-grid-3">
                     <fieldset class="dme-label-full">
-                        <legend>往信用封筒の使用有無を選択してください。</legend>
+                        <legend>往信用封筒を使用しますか</legend>
                         <div class="dme-radio-group">
-                            <label><input data-field="envelope.use" type="radio" name="dme_envelope_use" value="no">なし</label>
-                            <label><input data-field="envelope.use" type="radio" name="dme_envelope_use" value="yes">あり</label>
+                            <label><input data-field="envelope.use" type="radio" name="dme_envelope_use" value="no">使用しない（ハガキ・圧着DMなどを使用する）</label>
+                            <label><input data-field="envelope.use" type="radio" name="dme_envelope_use" value="yes">往信用封筒を使用する</label>
                         </div>
                     </fieldset>
                     <fieldset class="dme-label-full">
@@ -186,15 +186,15 @@ class DME_Plugin
                     <fieldset>
                         <legend>返信の方法を選択してください。</legend>
                         <div class="dme-radio-group">
-                            <label><input data-field="replyMode" type="radio" name="dme_reply_mode" value="stamp" checked>切手</label>
                             <label><input data-field="replyMode" type="radio" name="dme_reply_mode" value="receiver">受取人払い</label>
+                            <label><input data-field="replyMode" type="radio" name="dme_reply_mode" value="stamp" checked>切手</label>
                         </div>
                     </fieldset>
                     <fieldset class="dme-hidden" data-reply-block="delegate">
                         <legend>受取人払い申請の代行を希望しますか。</legend>
                         <div class="dme-radio-group">
-                            <label><input data-field="reply.delegate" type="radio" name="dme_reply_delegate" value="0" checked>自社で行う</label>
                             <label><input data-field="reply.delegate" type="radio" name="dme_reply_delegate" value="1">依頼する</label>
+                            <label><input data-field="reply.delegate" type="radio" name="dme_reply_delegate" value="0" checked>自社で行う</label>
                         </div>
                     </fieldset>
                 </div>
