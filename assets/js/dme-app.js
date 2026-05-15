@@ -2,7 +2,7 @@
   const state = {
     workType: '',
     shipMethod: '',
-    shipCount: 100,
+    shipCount: 1000,
     envelope: { use: '', mode: '', size: '', paper: '', thickness: '', tape: '', count: 100, spec: '' },
     replyMode: 'stamp',
     reply: { delegate: false },
