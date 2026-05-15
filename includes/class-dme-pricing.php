@@ -169,7 +169,7 @@ class DME_Pricing
         $mode = isset($content['mode']) ? (string) $content['mode'] : 'supplied';
 
         if ($mode === 'supplied') {
-            return ['item' => self::make_item($name . '（支給）', 0, $ship_count, '価格0円'), 'error' => null];
+            return ['item' => self::make_item($name . '（支給）', 0, 1, '価格0円'), 'error' => null];
         }
 
         $query = [
@@ -187,7 +187,7 @@ class DME_Pricing
         }
 
         return [
-            'item' => self::make_item($name, $found['unit_price'], $ship_count, $found['note']),
+            'item' => self::make_item($name, $found['unit_price'], 1, $found['note']),
             'error' => null,
         ];
     }
