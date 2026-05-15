@@ -131,6 +131,13 @@ class DME_Plugin
                             <label><input data-field="shipMethod" type="radio" name="dme_ship_method" value="post">郵送</label>
                         </div>
                     </fieldset>
+                    <fieldset class="dme-label-full">
+                        <legend>発送内容を選択してください。</legend>
+                        <div class="dme-radio-group">
+                            <label><input data-field="workType" type="radio" name="dme_work_type" value="survey" checked>アンケート発送</label>
+                            <label><input data-field="workType" type="radio" name="dme_work_type" value="dm">DM発送</label>
+                        </div>
+                    </fieldset>
                     <label>発送する部数は何部ですか。
                         <input data-field="shipCount" type="number" min="1" step="1" value="1000">
                     </label>
@@ -141,25 +148,18 @@ class DME_Plugin
                 <h3>往信用封筒</h3>
                 <div class="dme-grid dme-grid-3">
                     <fieldset class="dme-label-full">
-                        <legend>発送内容を選択してください。</legend>
-                        <div class="dme-radio-group">
-                            <label><input data-field="workType" type="radio" name="dme_work_type" value="dm">DM発送</label>
-                            <label><input data-field="workType" type="radio" name="dme_work_type" value="survey">アンケート発送</label>
-                        </div>
-                    </fieldset>
-                    <fieldset class="dme-label-full">
                         <legend>往信用封筒を使用しますか</legend>
                         <div class="dme-radio-group">
+                            <label><input data-field="envelope.use" type="radio" name="dme_envelope_use" value="yes" checked>往信用封筒を使用する</label>
                             <label><input data-field="envelope.use" type="radio" name="dme_envelope_use" value="no">使用しない（ハガキ・圧着DMなどを使用する）</label>
-                            <label><input data-field="envelope.use" type="radio" name="dme_envelope_use" value="yes">往信用封筒を使用する</label>
                         </div>
                     </fieldset>
                     <fieldset data-envelope-block="mode">
                         <legend>往信用封筒の種類を選択してください。</legend>
                         <div class="dme-radio-group dme-radio-group-nowrap">
-                            <label><input data-field="envelope.mode" type="radio" name="dme_envelope_mode" value="supplied">支給</label>
+                            <label><input data-field="envelope.mode" type="radio" name="dme_envelope_mode" value="print" checked>封筒印刷</label>
                             <label><input data-field="envelope.mode" type="radio" name="dme_envelope_mode" value="clear">透明封筒</label>
-                            <label><input data-field="envelope.mode" type="radio" name="dme_envelope_mode" value="print">封筒印刷</label>
+                            <label><input data-field="envelope.mode" type="radio" name="dme_envelope_mode" value="supplied">支給</label>
                         </div>
                     </fieldset>
                     <label class="dme-label-full" data-envelope-block="count">封筒の部数を入力してください。
@@ -173,8 +173,8 @@ class DME_Plugin
                     <fieldset data-envelope-field="tape">
                         <legend>テープ有無</legend>
                         <div class="dme-radio-group dme-radio-group-nowrap">
-                            <label><input data-field="envelope.tape" type="radio" name="dme_envelope_tape" value="" checked>なし</label>
-                            <label><input data-field="envelope.tape" type="radio" name="dme_envelope_tape" value="あり">あり</label>
+                            <label><input data-field="envelope.tape" type="radio" name="dme_envelope_tape" value="あり" checked>あり</label>
+                            <label><input data-field="envelope.tape" type="radio" name="dme_envelope_tape" value="">なし</label>
                         </div>
                     </fieldset>
                 </div>
