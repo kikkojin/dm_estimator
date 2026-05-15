@@ -141,6 +141,16 @@
     if (tapeField) tapeField.classList.toggle('dme-hidden', !showDetailed);
   }
 
+  function setReplyVisibility() {
+    const replyBlock = root.querySelector('[data-reply-block="container"]');
+    const delegateBlock = root.querySelector('[data-reply-block="delegate"]');
+    const showReply = state.workType === 'survey';
+    const showDelegate = showReply && state.replyMode === 'receiver';
+
+    if (replyBlock) replyBlock.classList.toggle('dme-hidden', !showReply);
+    if (delegateBlock) delegateBlock.classList.toggle('dme-hidden', !showDelegate);
+  }
+
   function refreshEnvelopeOptions() {
     const opts = getOptionsFor('envelope_print');
     // 往信用封筒の候補はシート名の分解結果から直接生成する。
@@ -195,6 +205,7 @@
       if (e.target.type === 'checkbox') val = !!e.target.checked;
       setByPath(state, field, val);
       if (field.startsWith('envelope.')) setEnvelopeVisibility();
+      if (field === 'workType' || field === 'replyMode') setReplyVisibility();
       fetchEstimate();
     }
     if (contact) {
@@ -263,6 +274,7 @@
 
   refreshEnvelopeOptions();
   setEnvelopeVisibility();
+  setReplyVisibility();
   addContentRow();
   // 初期表示時は「内容物1」の入力行のみ表示し、見積計算は実行しない。
   // これによりページ表示直後の明細自動表示を避け、入力導線を明確にする。

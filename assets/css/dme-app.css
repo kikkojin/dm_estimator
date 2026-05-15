@@ -9,6 +9,7 @@
 .dme-root fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
 .dme-root legend { font-weight: 600; margin-bottom: 4px; }
 .dme-radio-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.dme-radio-group-nowrap { flex-wrap: nowrap; }
 .dme-radio-group label {
   display: inline-flex;
   align-items: center;
