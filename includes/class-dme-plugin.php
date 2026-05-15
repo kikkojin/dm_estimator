@@ -193,8 +193,8 @@ class DME_Plugin
                     <fieldset class="dme-hidden" data-reply-block="delegate">
                         <legend>受取人払い申請の代行を希望しますか。</legend>
                         <div class="dme-radio-group">
-                            <label><input data-field="reply.delegate" type="radio" name="dme_reply_delegate" value="1">依頼する</label>
-                            <label><input data-field="reply.delegate" type="radio" name="dme_reply_delegate" value="0" checked>自社で行う</label>
+                            <label><input data-field="reply.delegate" type="radio" name="dme_reply_delegate" value="1" checked>依頼する</label>
+                            <label><input data-field="reply.delegate" type="radio" name="dme_reply_delegate" value="0">自社で行う</label>
                         </div>
                     </fieldset>
                 </div>

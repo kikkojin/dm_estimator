@@ -5,7 +5,7 @@
     shipCount: 1000,
     envelope: { use: '', mode: '', size: '', paper: '', thickness: '', tape: '', count: 100, spec: '' },
     replyMode: 'stamp',
-    reply: { delegate: false },
+    reply: { delegate: true },
     envelopeDesignRequest: false,
     contents: [],
     contact: {},
