@@ -134,6 +134,13 @@ class DME_Plugin
                     <label>発送する部数は何部ですか。
                         <input data-field="shipCount" type="number" min="1" step="1" value="1000">
                     </label>
+                    <fieldset class="dme-label-full">
+                        <legend>発送内容を選択してください。</legend>
+                        <div class="dme-radio-group">
+                            <label><input data-field="workType" type="radio" name="dme_work_type" value="dm">DM発送</label>
+                            <label><input data-field="workType" type="radio" name="dme_work_type" value="survey">アンケート発送</label>
+                        </div>
+                    </fieldset>
                 </div>
             </div>
 
@@ -147,19 +154,12 @@ class DME_Plugin
                             <label><input data-field="envelope.use" type="radio" name="dme_envelope_use" value="yes">往信用封筒を使用する</label>
                         </div>
                     </fieldset>
-                    <fieldset class="dme-label-full">
-                        <legend>発送内容を選択してください。</legend>
-                        <div class="dme-radio-group">
-                            <label><input data-field="workType" type="radio" name="dme_work_type" value="dm">DM発送</label>
-                            <label><input data-field="workType" type="radio" name="dme_work_type" value="survey">アンケート発送</label>
-                        </div>
-                    </fieldset>
                     <fieldset data-envelope-block="mode">
                         <legend>往信用封筒の種類を選択してください。</legend>
                         <div class="dme-radio-group dme-radio-group-nowrap">
-                            <label><input data-field="envelope.mode" type="radio" name="dme_envelope_mode" value="supplied">支給</label>
-                            <label><input data-field="envelope.mode" type="radio" name="dme_envelope_mode" value="clear">透明封筒</label>
                             <label><input data-field="envelope.mode" type="radio" name="dme_envelope_mode" value="print">封筒印刷</label>
+                            <label><input data-field="envelope.mode" type="radio" name="dme_envelope_mode" value="clear">透明封筒</label>
+                            <label><input data-field="envelope.mode" type="radio" name="dme_envelope_mode" value="supplied">支給</label>
                         </div>
                     </fieldset>
                     <label class="dme-label-full" data-envelope-block="count">封筒の部数を入力してください。
