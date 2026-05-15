@@ -127,7 +127,7 @@ class DME_Pricing
     private static function calc_envelope($envelope, $ship_count, $catalog)
     {
         $mode = isset($envelope['mode']) ? (string) $envelope['mode'] : 'supplied';
-        $count = isset($envelope['count']) ? absint($envelope['count']) : $ship_count;
+        $count = isset($envelope['count']) ? absint($envelope['count']) : 1;
         if ($count <= 0) {
             return ['item' => null, 'error' => '封筒部数が不足しています。'];
         }
