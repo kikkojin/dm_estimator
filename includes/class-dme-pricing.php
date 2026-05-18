@@ -155,6 +155,10 @@ class DME_Pricing
             'quantity' => $count,
         ];
 
+        if ($query['size'] === '' || $query['paper'] === '' || $query['thickness'] === '' || $query['tape'] === '') {
+            return ['item' => null, 'error' => '封筒印刷の条件（サイズ・紙質・厚み・テープ有無）が不足しています。'];
+        }
+
         $found = self::find_price_from_catalog($catalog, $query);
         if ($found === null) {
             return ['item' => null, 'error' => '封筒印刷の価格取得不可。'];
@@ -214,8 +218,15 @@ class DME_Pricing
                 continue;
             }
 
-            if (!empty($query['tape']) && (!isset($conditions['tape']) || $conditions['tape'] !== $query['tape'])) {
-                continue;
+            if (isset($query['tape']) && $query['tape'] !== '') {
+                $condition_tape = isset($conditions['tape']) ? (string) $conditions['tape'] : '';
+                if ($query['tape'] === 'none') {
+                    if ($condition_tape !== '') {
+                        continue;
+                    }
+                } elseif ($condition_tape !== $query['tape']) {
+                    continue;
+                }
             }
 
             $spec = $query['spec'];
