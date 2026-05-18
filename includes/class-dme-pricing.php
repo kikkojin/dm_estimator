@@ -92,8 +92,7 @@ class DME_Pricing
         } else {
             $items[] = self::make_item('受取人払い', 0, 1, '料金は個別見積');
             if (!empty($payload['reply']['delegate'])) {
-                // TODO: 申請代行の作業コード確定後は find_work_fee_by_code() に切り替える。
-                $delegate_fee = self::find_work_fee($catalog, '申請代行');
+                $delegate_fee = self::find_work_fee_by_code($catalog, 'shinsei_daiko');
                 if ($delegate_fee !== null) {
                     $items[] = self::make_item('受取人払い申請代行', $delegate_fee, 1, 'オプション');
                 }
