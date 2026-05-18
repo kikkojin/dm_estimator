@@ -129,13 +129,13 @@
 
     const showMode = use === 'yes';
     const showDetailed = showMode && (mode === 'supplied' || mode === 'print');
-    const showClear = showMode && mode === 'clear';
+    const showCount = showMode;
 
     if (modeBlock) modeBlock.classList.toggle('dme-hidden', !showMode);
-    if (countBlock) countBlock.classList.toggle('dme-hidden', !(showDetailed || showClear));
-    if (detailBlock) detailBlock.classList.toggle('dme-hidden', !(showDetailed || showClear));
+    if (countBlock) countBlock.classList.toggle('dme-hidden', !showCount);
+    if (detailBlock) detailBlock.classList.toggle('dme-hidden', !showDetailed);
 
-    if (sizeField) sizeField.classList.toggle('dme-hidden', !(showDetailed || showClear));
+    if (sizeField) sizeField.classList.toggle('dme-hidden', !showDetailed);
     if (paperField) paperField.classList.toggle('dme-hidden', !showDetailed);
     if (thicknessField) thicknessField.classList.toggle('dme-hidden', !showDetailed);
     if (tapeField) tapeField.classList.toggle('dme-hidden', !showDetailed);
