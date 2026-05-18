@@ -125,7 +125,7 @@ class DME_Plugin
                 <h3>基本条件</h3>
                 <div class="dme-grid dme-grid-3">
                     <fieldset class="dme-label-full">
-                        <legend>発送方法を選択してください。（メール便のご利用は、信書に該当しないものに限られます。）</legend>
+                        <legend>発送方法を選択してください。<br>（メール便のご利用は、信書に該当しないものに限られます。）</legend>
                         <div class="dme-radio-group">
                             <label><input data-field="shipMethod" type="radio" name="dme_ship_method" value="mail">メール便</label>
                             <label><input data-field="shipMethod" type="radio" name="dme_ship_method" value="post">郵送</label>
@@ -134,7 +134,7 @@ class DME_Plugin
                     <fieldset class="dme-label-full">
                         <legend>発送内容を選択してください。</legend>
                         <div class="dme-radio-group">
-                            <label><input data-field="workType" type="radio" name="dme_work_type" value="survey" checked>アンケート発送</label>
+                            <label><input data-field="workType" type="radio" name="dme_work_type" value="survey">アンケート発送</label>
                             <label><input data-field="workType" type="radio" name="dme_work_type" value="dm">DM発送</label>
                         </div>
                     </fieldset>
@@ -150,14 +150,14 @@ class DME_Plugin
                     <fieldset class="dme-label-full">
                         <legend>往信用封筒を使用しますか</legend>
                         <div class="dme-radio-group">
-                            <label><input data-field="envelope.use" type="radio" name="dme_envelope_use" value="yes" checked>往信用封筒を使用する</label>
+                            <label><input data-field="envelope.use" type="radio" name="dme_envelope_use" value="yes">往信用封筒を使用する</label>
                             <label><input data-field="envelope.use" type="radio" name="dme_envelope_use" value="no">使用しない（ハガキ・圧着DMなどを使用する）</label>
                         </div>
                     </fieldset>
                     <fieldset data-envelope-block="mode">
                         <legend>往信用封筒の種類を選択してください。</legend>
                         <div class="dme-radio-group dme-radio-group-nowrap">
-                            <label><input data-field="envelope.mode" type="radio" name="dme_envelope_mode" value="print" checked>封筒印刷</label>
+                            <label><input data-field="envelope.mode" type="radio" name="dme_envelope_mode" value="print">封筒印刷</label>
                             <label><input data-field="envelope.mode" type="radio" name="dme_envelope_mode" value="clear">透明封筒</label>
                             <label><input data-field="envelope.mode" type="radio" name="dme_envelope_mode" value="supplied">支給</label>
                         </div>
@@ -173,7 +173,7 @@ class DME_Plugin
                     <fieldset data-envelope-field="tape">
                         <legend>テープ有無</legend>
                         <div class="dme-radio-group dme-radio-group-nowrap">
-                            <label><input data-field="envelope.tape" type="radio" name="dme_envelope_tape" value="あり" checked>あり</label>
+                            <label><input data-field="envelope.tape" type="radio" name="dme_envelope_tape" value="あり">あり</label>
                             <label><input data-field="envelope.tape" type="radio" name="dme_envelope_tape" value="">なし</label>
                         </div>
                     </fieldset>
@@ -187,13 +187,13 @@ class DME_Plugin
                         <legend>返信の方法を選択してください。</legend>
                         <div class="dme-radio-group">
                             <label><input data-field="replyMode" type="radio" name="dme_reply_mode" value="receiver">受取人払い</label>
-                            <label><input data-field="replyMode" type="radio" name="dme_reply_mode" value="stamp" checked>切手</label>
+                            <label><input data-field="replyMode" type="radio" name="dme_reply_mode" value="stamp">切手</label>
                         </div>
                     </fieldset>
                     <fieldset class="dme-hidden" data-reply-block="delegate">
                         <legend>受取人払い申請の代行を希望しますか。</legend>
                         <div class="dme-radio-group">
-                            <label><input data-field="reply.delegate" type="radio" name="dme_reply_delegate" value="1" checked>依頼する</label>
+                            <label><input data-field="reply.delegate" type="radio" name="dme_reply_delegate" value="1">依頼する</label>
                             <label><input data-field="reply.delegate" type="radio" name="dme_reply_delegate" value="0">自社で行う</label>
                         </div>
                     </fieldset>

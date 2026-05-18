@@ -1,11 +1,11 @@
 (() => {
   const state = {
-    workType: 'survey',
+    workType: '',
     shipMethod: '',
     shipCount: 1000,
-    envelope: { use: 'yes', mode: 'print', size: '', paper: '', thickness: '', tape: 'あり', count: 100, spec: '' },
-    replyMode: 'stamp',
-    reply: { delegate: true },
+    envelope: { use: '', mode: '', size: '', paper: '', thickness: '', tape: '', count: 100, spec: '' },
+    replyMode: '',
+    reply: { delegate: '' },
     envelopeDesignRequest: false,
     contents: [],
     contact: {},
