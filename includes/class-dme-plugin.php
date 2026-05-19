@@ -162,8 +162,8 @@ class DME_Plugin
                             <label><input data-field="envelope.mode" type="radio" name="dme_envelope_mode" value="supplied">支給</label>
                         </div>
                     </fieldset>
-                    <label class="dme-label-full" data-envelope-block="count">封筒の部数を入力してください。
-                        <input data-field="envelope.count" type="number" min="1" step="1" value="100">
+                    <label class="dme-label-full" data-envelope-block="count">封筒の部数を選択してください。
+                        <select data-field="envelope.count"></select>
                     </label>
                 </div>
                 <div class="dme-grid dme-grid-4" data-envelope-block="detail">

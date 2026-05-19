@@ -3,7 +3,7 @@
     workType: '',
     shipMethod: '',
     shipCount: 1000,
-    envelope: { use: '', mode: '', size: '', paper: '', thickness: '', tape: '', count: 100, spec: '' },
+    envelope: { use: '', mode: '', size: '', paper: '', thickness: '', tape: '', count: 0, spec: '' },
     replyMode: '',
     reply: { delegate: '' },
     envelopeDesignRequest: false,
@@ -174,6 +174,48 @@
       }
     });
     state.envelope.spec = opts.spec[0] || '';
+    refreshEnvelopeCountOptions();
+  }
+
+  function getEnvelopePrintQuantities() {
+    const filtered = printCatalog.filter((sheet) => {
+      if (sheet.bookKey !== 'envelope_print') return false;
+      const conditions = sheet.conditions || {};
+      if (state.envelope.size && conditions.size !== state.envelope.size) return false;
+      if (state.envelope.paper && conditions.paper !== state.envelope.paper) return false;
+      if (state.envelope.thickness && conditions.thickness !== state.envelope.thickness) return false;
+      if (state.envelope.tape && conditions.tape !== state.envelope.tape) return false;
+      return true;
+    });
+    const values = [...new Set(filtered.flatMap((sheet) => sheet.quantities || []))]
+      .map((n) => Number(n))
+      .filter((n) => Number.isFinite(n) && n > 0)
+      .sort((a, b) => a - b);
+    return values;
+  }
+
+  function pickInitialEnvelopeCount(quantities) {
+    if (!quantities.length) return 0;
+    const required = Number(state.shipCount || 0);
+    const selected = quantities.find((qty) => qty >= required);
+    return selected || quantities[quantities.length - 1];
+  }
+
+  function refreshEnvelopeCountOptions() {
+    const el = root.querySelector('[data-field="envelope.count"]');
+    if (!el) return;
+    const quantities = getEnvelopePrintQuantities();
+    if (!quantities.length) {
+      el.innerHTML = '<option value="">選択してください</option>';
+      state.envelope.count = 0;
+      return;
+    }
+
+    const selected = quantities.includes(Number(state.envelope.count))
+      ? Number(state.envelope.count)
+      : pickInitialEnvelopeCount(quantities);
+    state.envelope.count = selected;
+    el.innerHTML = quantities.map((qty) => `<option value="${qty}" ${qty === selected ? 'selected' : ''}>${qty}</option>`).join('');
   }
 
   function addContentRow() {
@@ -218,6 +260,7 @@
       if (e.target.type === 'checkbox') val = !!e.target.checked;
       setByPath(state, field, val);
       if (field.startsWith('envelope.')) setEnvelopeVisibility();
+      if (field === 'shipCount' || field.startsWith('envelope.')) refreshEnvelopeCountOptions();
       if (field === 'workType' || field === 'replyMode') setReplyVisibility();
       fetchEstimate();
     }
