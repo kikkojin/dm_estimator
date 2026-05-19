@@ -115,6 +115,19 @@
     return ['<option value="">選択してください</option>'].concat(values.map((v) => `<option value="${v}" ${selected === v ? 'selected' : ''}>${v}</option>`)).join('');
   }
 
+  const BOOK_KEY_LABELS = {
+    a4_offset: 'A4オフセット',
+    envelope_print: '封筒',
+    booklet: '冊子',
+    leaflet: 'リーフレット',
+    pressure_dm: '圧着DM',
+    postcard: 'はがき',
+  };
+
+  function getBookKeyLabel(bookKey) {
+    return BOOK_KEY_LABELS[bookKey] || bookKey;
+  }
+
 
   function setEnvelopeVisibility() {
     const use = state.envelope.use;
@@ -175,7 +188,7 @@
       <div class="dme-grid dme-grid-4">
         <label>名称<input data-content="name" type="text" value="内容物${idx + 1}"></label>
         <label>種別<select data-content="mode"><option value="print">印刷</option><option value="supplied">支給</option></select></label>
-        <label>種類<select data-content="bookKey"><option value="">選択</option>${[...new Set(printCatalog.map((s) => s.bookKey))].map((k) => `<option value="${k}">${k}</option>`).join('')}</select></label>
+        <label>種類<select data-content="bookKey"><option value="">選択</option>${[...new Set(printCatalog.map((s) => s.bookKey))].map((k) => `<option value="${k}">${getBookKeyLabel(k)}</option>`).join('')}</select></label>
         <label>カラー/仕様<select data-content="spec"></select></label>
         <label>サイズ<select data-content="size"></select></label>
         <label>紙質<select data-content="paper"></select></label>
