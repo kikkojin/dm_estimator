@@ -173,8 +173,8 @@ class DME_Plugin
                     <fieldset data-envelope-field="tape">
                         <legend>テープ有無</legend>
                         <div class="dme-radio-group dme-radio-group-nowrap">
-                            <label><input data-field="envelope.tape" type="radio" name="dme_envelope_tape" value="あり">あり</label>
-                            <label><input data-field="envelope.tape" type="radio" name="dme_envelope_tape" value="none">なし</label>
+                            <label><input data-field="envelope.tape" type="radio" name="dme_envelope_tape" value="テープ有り">あり</label>
+                            <label><input data-field="envelope.tape" type="radio" name="dme_envelope_tape" value="テープ無し">なし</label>
                         </div>
                     </fieldset>
                 </div>
