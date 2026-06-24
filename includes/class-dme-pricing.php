@@ -163,7 +163,7 @@ class DME_Pricing
             return ['item' => null, 'error' => '封筒印刷の価格取得不可。'];
         }
 
-        return ['item' => self::make_item('封筒印刷', $found['unit_price'], $count, $found['note']), 'error' => null];
+        return ['item' => self::make_item('封筒印刷', $found['unit_price'], 1, $found['note']), 'error' => null];
     }
 
     private static function calc_content_item($content, $ship_count, $catalog)
