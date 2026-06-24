@@ -219,11 +219,7 @@ class DME_Pricing
 
             if (isset($query['tape']) && $query['tape'] !== '') {
                 $condition_tape = isset($conditions['tape']) ? (string) $conditions['tape'] : '';
-                if ($query['tape'] === 'none') {
-                    if ($condition_tape !== '') {
-                        continue;
-                    }
-                } elseif ($condition_tape !== $query['tape']) {
+                if ($condition_tape !== $query['tape']) {
                     continue;
                 }
             }
