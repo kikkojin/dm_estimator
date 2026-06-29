@@ -104,6 +104,13 @@ class DME_Ajax
         $lines[] = 'メール: ' . self::s($contact, 'email');
         $lines[] = '希望日: ' . self::s($contact, 'desired_date');
         $lines[] = '備考: ' . self::s($contact, 'note');
+        if (isset($payload['replyMode']) && $payload['replyMode'] === 'receiver') {
+            $receiver_reply_summary = self::get_receiver_reply_summary($estimate);
+            if ($receiver_reply_summary !== null) {
+                $lines[] = '受取人払い想定返信率: ' . $receiver_reply_summary['response_rate'] . '％';
+                $lines[] = '受取人払い想定返信数: ' . $receiver_reply_summary['estimated_response_count'] . '通';
+            }
+        }
         $lines[] = '';
         $lines[] = '【見積明細】';
 
@@ -127,6 +134,29 @@ class DME_Ajax
     private static function s($arr, $key)
     {
         return isset($arr[$key]) ? sanitize_text_field((string) $arr[$key]) : '';
+    }
+
+    private static function get_receiver_reply_summary($estimate)
+    {
+        if (empty($estimate['items']) || !is_array($estimate['items'])) {
+            return null;
+        }
+
+        foreach ($estimate['items'] as $item) {
+            if (!isset($item['label']) || $item['label'] !== '受取人払い') {
+                continue;
+            }
+
+            $note = isset($item['note']) ? (string) $item['note'] : '';
+            if (preg_match('/想定返信率([0-9]+)％・想定返信数([0-9]+)通/u', $note, $matches)) {
+                return [
+                    'response_rate' => (int) $matches[1],
+                    'estimated_response_count' => (int) $matches[2],
+                ];
+            }
+        }
+
+        return null;
     }
 
     /**

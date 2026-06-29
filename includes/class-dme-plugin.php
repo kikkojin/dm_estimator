@@ -190,6 +190,12 @@ class DME_Plugin
                             <label><input data-field="replyMode" type="radio" name="dme_reply_mode" value="stamp">切手</label>
                         </div>
                     </fieldset>
+                    <label class="dme-hidden" data-reply-block="response-rate">返信率をどのくらいに想定しますか
+                        <span class="dme-percent-field">
+                            <input data-field="reply.responseRate" type="number" min="1" max="100" step="1" inputmode="numeric">
+                            <span aria-hidden="true">％</span>
+                        </span>
+                    </label>
                     <fieldset class="dme-hidden" data-reply-block="delegate">
                         <legend>受取人払い申請の代行を希望しますか。</legend>
                         <div class="dme-radio-group">

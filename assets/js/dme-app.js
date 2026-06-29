@@ -5,7 +5,7 @@
     shipCount: 1000,
     envelope: { use: '', mode: '', size: '', paper: '', thickness: '', tape: '', count: 0, spec: '' },
     replyMode: '',
-    reply: { delegate: '' },
+    reply: { delegate: '', responseRate: '' },
     envelopeDesignRequest: false,
     contents: [],
     contact: {},
@@ -157,11 +157,15 @@
   function setReplyVisibility() {
     const replyBlock = root.querySelector('[data-reply-block="container"]');
     const delegateBlock = root.querySelector('[data-reply-block="delegate"]');
+    const responseRateBlock = root.querySelector('[data-reply-block="response-rate"]');
+    const responseRateInput = root.querySelector('[data-field="reply.responseRate"]');
     const showReply = state.workType === 'survey';
-    const showDelegate = showReply && state.replyMode === 'receiver';
+    const showReceiverOnly = showReply && state.replyMode === 'receiver';
 
     if (replyBlock) replyBlock.classList.toggle('dme-hidden', !showReply);
-    if (delegateBlock) delegateBlock.classList.toggle('dme-hidden', !showDelegate);
+    if (delegateBlock) delegateBlock.classList.toggle('dme-hidden', !showReceiverOnly);
+    if (responseRateBlock) responseRateBlock.classList.toggle('dme-hidden', !showReceiverOnly);
+    if (responseRateInput) responseRateInput.required = showReceiverOnly;
   }
 
   function refreshEnvelopeOptions() {
@@ -256,7 +260,7 @@
     const contact = e.target.getAttribute('data-contact');
     if (field) {
       let val = e.target.value;
-      if (e.target.type === 'number') val = Number(val || 0);
+      if (e.target.type === 'number') val = e.target.value === '' ? '' : Number(e.target.value);
       if (e.target.type === 'checkbox') val = !!e.target.checked;
       setByPath(state, field, val);
       if (field.startsWith('envelope.')) setEnvelopeVisibility();

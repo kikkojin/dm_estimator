@@ -89,8 +89,19 @@ class DME_Pricing
                 $items[] = self::make_item('切手貼代', $stamp_fee, $ship_count, '返信方法: 切手');
                 $items[] = self::make_item('返信郵便料金', $postage, $ship_count, '重量計算ベース');
             }
-        } else {
-            $items[] = self::make_item('受取人払い', 0, 1, '料金は個別見積');
+        } elseif ($reply_mode === 'receiver') {
+            $response_rate = self::get_receiver_response_rate($payload);
+            if ($response_rate === null) {
+                $errors[] = '受取人払いの返信率は1～100の整数で入力してください。';
+            } else {
+                $estimated_response_count = (int) ceil($ship_count * $response_rate / 100);
+                $items[] = self::make_item(
+                    '受取人払い',
+                    0,
+                    $estimated_response_count,
+                    sprintf('想定返信率%d％・想定返信数%d通／郵便料金は別途見積', $response_rate, $estimated_response_count)
+                );
+            }
             if (!empty($payload['reply']['delegate'])) {
                 $delegate_fee = self::find_work_fee_by_code($catalog, 'shinsei_daiko');
                 if ($delegate_fee !== null) {
@@ -121,6 +132,28 @@ class DME_Pricing
             'is_estimatable' => empty($errors),
             'errors' => $errors,
         ];
+    }
+
+    private static function get_receiver_response_rate($payload)
+    {
+        if (!isset($payload['reply']) || !is_array($payload['reply']) || !array_key_exists('responseRate', $payload['reply'])) {
+            return null;
+        }
+
+        $response_rate = $payload['reply']['responseRate'];
+        if (is_string($response_rate)) {
+            $response_rate = trim($response_rate);
+        }
+        if ($response_rate === '' || filter_var($response_rate, FILTER_VALIDATE_INT) === false) {
+            return null;
+        }
+
+        $response_rate = (int) $response_rate;
+        if ($response_rate < 1 || $response_rate > 100) {
+            return null;
+        }
+
+        return $response_rate;
     }
 
     private static function calc_envelope($envelope, $ship_count, $catalog)
@@ -535,7 +568,7 @@ class DME_Pricing
     {
         foreach ($items as &$item) {
             // 「0円誤表示禁止」ルールにより、0円は理由を備考に明示。
-            if ((int) $item['unit_price'] === 0 && mb_strpos((string) $item['note'], '0円') === false) {
+            if ($item['label'] !== '受取人払い' && (int) $item['unit_price'] === 0 && mb_strpos((string) $item['note'], '0円') === false) {
                 $item['note'] .= '（0円理由明記）';
             }
         }
