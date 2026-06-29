@@ -54,3 +54,17 @@
 .dme-content-row { border-top: 1px dashed #ccc; padding-top: 10px; margin-top: 10px; }
 
 .dme-hidden { display: none !important; }
+
+.dme-percent-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dme-percent-field input {
+  width: 100%;
+}
+.dme-percent-field span {
+  flex: 0 0 auto;
+  margin-top: 4px;
+  font-weight: 700;
+}
